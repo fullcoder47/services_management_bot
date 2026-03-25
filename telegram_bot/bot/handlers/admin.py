@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from html import escape
+
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, User as AiogramUser
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message, User as AiogramUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.admin_keyboard import (
@@ -12,6 +14,7 @@ from bot.keyboards.admin_keyboard import (
     AdminConfirmCallback,
     AdminMenuCallback,
     AdminRoleCallback,
+    build_admin_cancel_keyboard,
     build_admin_company_select_keyboard,
     build_admin_confirm_keyboard,
     build_admin_role_select_keyboard,
@@ -19,11 +22,7 @@ from bot.keyboards.admin_keyboard import (
 from bot.states import AdminAssignStates
 from db.models import Company, User, UserRole
 from services.company_service import CompanyService
-from services.user_service import (
-    TelegramUserDTO,
-    UserRoleChangeError,
-    UserService,
-)
+from services.user_service import TelegramUserDTO, UserRoleChangeError, UserService
 
 
 router = Router(name=__name__)
@@ -57,6 +56,24 @@ async def admin_panel_cancel(
     await callback.answer()
 
 
+@router.callback_query(AdminMenuCallback.filter(F.action == "list_users"))
+async def admin_assignments_list(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    current_user = await _authorize_super_admin_callback(callback, session)
+    if current_user is None:
+        return
+
+    await state.clear()
+    await state.set_state(AdminAssignStates.waiting_for_company)
+    text, keyboard = await _build_admin_assignments_view(session)
+    if callback.message is not None:
+        await _safe_edit_text(callback.message, text, reply_markup=keyboard)
+    await callback.answer()
+
+
 @router.callback_query(AdminCompanyCallback.filter(), AdminAssignStates.waiting_for_company)
 async def admin_select_company(
     callback: CallbackQuery,
@@ -78,9 +95,14 @@ async def admin_select_company(
     await state.update_data(company_id=company.id, company_name=company.name)
 
     if callback.message is not None:
+        management_text = await _build_company_management_text(session, company)
         await _safe_edit_text(
             callback.message,
-            f"👤 Admin boshqaruvi\n\nKompaniya: <b>{company.name}</b>\n\nTelegram user ID yuboring",
+            "👤 Admin boshqaruvi\n\n"
+            f"Kompaniya: <b>{escape(company.name)}</b>\n\n"
+            f"{management_text}\n\n"
+            "Telegram user ID yuboring",
+            reply_markup=build_admin_cancel_keyboard(),
         )
     await callback.answer()
 
@@ -137,7 +159,7 @@ async def admin_select_role(
         await _safe_edit_text(
             callback.message,
             "Tasdiqlang:\n\n"
-            f"Kompaniya: <b>{company_name}</b>\n"
+            f"Kompaniya: <b>{escape(company_name)}</b>\n"
             f"ID: <b>{user_id}</b>\n"
             f"Rol: <b>{role.value}</b>",
             reply_markup=build_admin_confirm_keyboard(),
@@ -187,28 +209,21 @@ async def admin_confirm_assign(
 
     await state.clear()
     await state.set_state(AdminAssignStates.waiting_for_company)
-    companies = await company_service.list_companies()
-    company_users = await user_service.get_users_by_company(company.id)
-    management_lines = [
-        f"- {item.telegram_id} | {item.role.value}"
-        for item in company_users
-        if item.role in {UserRole.ADMIN, UserRole.OPERATOR}
-    ]
+    panel_text, keyboard = await _build_admin_panel_view(session)
+    management_text = await _build_company_management_text(session, company)
 
     result_text = (
         "✅ User muvaffaqiyatli qo‘shildi:\n"
         f"ID: <b>{user.telegram_id}</b>\n"
-        f"Role: <b>{user.role.value}</b>\n"
-        f"Company: <b>{company.name}</b>"
+        f"Rol: <b>{user.role.value}</b>\n"
+        f"Kompaniya: <b>{escape(company.name)}</b>"
     )
-    if management_lines:
-        result_text += "\n\nJoriy admin/operatorlar:\n" + "\n".join(management_lines)
 
     if callback.message is not None:
         await _safe_edit_text(
             callback.message,
-            result_text + "\n\nKompaniyani tanlang",
-            reply_markup=build_admin_company_select_keyboard(companies),
+            result_text + "\n\n" + management_text + "\n\n" + panel_text,
+            reply_markup=keyboard,
         )
     await callback.answer()
 
@@ -234,17 +249,8 @@ async def _show_admin_panel_message(
 ) -> None:
     await state.clear()
     await state.set_state(AdminAssignStates.waiting_for_company)
-
-    company_service = CompanyService(session)
-    companies = await company_service.list_companies()
-    if not companies:
-        await message.answer("👤 Admin boshqaruvi\n\nHali kompaniyalar mavjud emas.")
-        return
-
-    await message.answer(
-        "👤 Admin boshqaruvi\n\nKompaniyani tanlang",
-        reply_markup=build_admin_company_select_keyboard(companies),
-    )
+    text, keyboard = await _build_admin_panel_view(session)
+    await message.answer(text, reply_markup=keyboard)
 
 
 async def _show_admin_panel_callback(
@@ -254,19 +260,82 @@ async def _show_admin_panel_callback(
 ) -> None:
     await state.clear()
     await state.set_state(AdminAssignStates.waiting_for_company)
-
-    company_service = CompanyService(session)
-    companies = await company_service.list_companies()
-    text = "👤 Admin boshqaruvi\n\nKompaniyani tanlang"
-    if not companies:
-        text = "👤 Admin boshqaruvi\n\nHali kompaniyalar mavjud emas."
+    text, keyboard = await _build_admin_panel_view(session)
 
     if callback.message is not None:
         await _safe_edit_text(
             callback.message,
             text,
-            reply_markup=build_admin_company_select_keyboard(companies) if companies else None,
+            reply_markup=keyboard,
         )
+
+
+async def _build_admin_panel_view(
+    session: AsyncSession,
+) -> tuple[str, InlineKeyboardMarkup]:
+    company_service = CompanyService(session)
+    companies = await company_service.list_companies()
+
+    lines = [
+        "👤 Admin boshqaruvi",
+        "",
+        "Kompaniyani tanlang yoki pastdagi tugma orqali ro‘yxatni oching.",
+    ]
+    if not companies:
+        lines.extend(["", "Hali kompaniyalar mavjud emas."])
+
+    return "\n".join(lines), build_admin_company_select_keyboard(companies)
+
+
+async def _build_admin_assignments_view(
+    session: AsyncSession,
+) -> tuple[str, InlineKeyboardMarkup]:
+    company_service = CompanyService(session)
+    companies = await company_service.list_companies()
+    user_service = UserService(session)
+    summary = await user_service.get_management_users_by_company_ids(
+        [company.id for company in companies]
+    )
+
+    lines = ["📋 Qo‘shilgan adminlar ro‘yxati", ""]
+    if not companies:
+        lines.append("Hali kompaniyalar mavjud emas.")
+    else:
+        for company in companies:
+            company_summary = summary.get(
+                company.id,
+                {
+                    UserRole.ADMIN: [],
+                    UserRole.OPERATOR: [],
+                },
+            )
+            lines.append(f"<b>{escape(company.name)}</b>")
+            lines.append(
+                "Adminlar: "
+                + _format_management_users(company_summary.get(UserRole.ADMIN, []))
+            )
+            lines.append(
+                "Operatorlar: "
+                + _format_management_users(company_summary.get(UserRole.OPERATOR, []))
+            )
+            lines.append("")
+
+    return "\n".join(lines).strip(), build_admin_cancel_keyboard()
+
+
+async def _build_company_management_text(
+    session: AsyncSession,
+    company: Company,
+) -> str:
+    user_service = UserService(session)
+    users = await user_service.get_users_by_company(company.id)
+    admins = [user for user in users if user.role == UserRole.ADMIN]
+    operators = [user for user in users if user.role == UserRole.OPERATOR]
+    return (
+        "<b>Joriy biriktirilganlar</b>\n"
+        f"Adminlar: {_format_management_users(admins)}\n"
+        f"Operatorlar: {_format_management_users(operators)}"
+    )
 
 
 async def _authorize_super_admin_message(
@@ -274,7 +343,7 @@ async def _authorize_super_admin_message(
     session: AsyncSession,
 ) -> User | None:
     if message.from_user is None:
-        await message.answer("Telegram profilingizni aniqlab bo‘lmadi.")
+        await message.answer("Telegram profilingizni aniqlab bo'lmadi.")
         return None
 
     user = await _register_and_get_user(message.from_user, session)
@@ -289,7 +358,7 @@ async def _authorize_super_admin_callback(
     session: AsyncSession,
 ) -> User | None:
     if callback.from_user is None:
-        await callback.answer("Telegram profilingizni aniqlab bo‘lmadi.", show_alert=True)
+        await callback.answer("Telegram profilingizni aniqlab bo'lmadi.", show_alert=True)
         return None
 
     user = await _register_and_get_user(callback.from_user, session)
@@ -316,6 +385,15 @@ def _parse_assign_role(role_value: str) -> UserRole | None:
     if role_value == UserRole.OPERATOR.value:
         return UserRole.OPERATOR
     return None
+
+
+def _format_management_users(users: list[User]) -> str:
+    if not users:
+        return "yo'q"
+
+    return ", ".join(
+        f"<b>{escape(user.display_name)}</b> ({user.telegram_id})" for user in users
+    )
 
 
 async def _safe_edit_text(

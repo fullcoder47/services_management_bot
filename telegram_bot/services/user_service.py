@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 
 from aiogram.types import User as AiogramUser
@@ -86,6 +87,36 @@ class UserService:
         statement = select(User).where(User.company_id == company_id).order_by(User.id.asc())
         result = await self._session.execute(statement)
         return list(result.scalars().all())
+
+    async def get_management_users_by_company_ids(
+        self,
+        company_ids: list[int],
+    ) -> dict[int, dict[UserRole, list[User]]]:
+        if not company_ids:
+            return {}
+
+        statement = (
+            select(User)
+            .where(
+                User.company_id.in_(company_ids),
+                User.role.in_([UserRole.ADMIN, UserRole.OPERATOR]),
+            )
+            .order_by(User.company_id.asc(), User.role.asc(), User.id.asc())
+        )
+        result = await self._session.execute(statement)
+
+        summary: dict[int, dict[UserRole, list[User]]] = defaultdict(
+            lambda: {
+                UserRole.ADMIN: [],
+                UserRole.OPERATOR: [],
+            }
+        )
+        for user in result.scalars().all():
+            if user.company_id is None:
+                continue
+            summary[user.company_id][user.role].append(user)
+
+        return dict(summary)
 
     async def assign_user_to_company(self, user_id: int, company_id: int, role: UserRole) -> User:
         if role == UserRole.SUPER_ADMIN:

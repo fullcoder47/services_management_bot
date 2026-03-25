@@ -116,6 +116,18 @@ class CompanyService:
         company.subscription_end = normalize_utc_datetime(company.subscription_end)
         return company
 
+    async def deactivate_subscription(self, company_id: int) -> Company:
+        company = await self.get_company(company_id)
+        if company is None:
+            raise CompanyNotFoundError("Kompaniya topilmadi.")
+
+        company.subscription_end = None
+        company.is_active = False
+
+        await self._session.commit()
+        await self._session.refresh(company)
+        return company
+
     async def has_access(self, company_id: int) -> bool:
         company = await self.get_company(company_id)
         return bool(company and self.check_access(company))
