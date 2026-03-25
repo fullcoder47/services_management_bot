@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -74,7 +75,7 @@ async def companies_list_callback(
     await state.clear()
     text, keyboard = await _build_company_list_view(session)
     if callback.message is not None:
-        await callback.message.edit_text(text, reply_markup=keyboard)
+        await _safe_edit_text(callback.message, text, reply_markup=keyboard)
     await callback.answer()
 
 
@@ -92,7 +93,8 @@ async def start_company_create(
     await state.set_state(CompanyManagementStates.waiting_for_name)
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             "Kompaniya nomini yuboring.",
             reply_markup=build_company_cancel_keyboard(),
         )
@@ -139,7 +141,7 @@ async def create_company_from_plan(
         await state.clear()
         if callback.message is not None:
             text, keyboard = await _build_company_list_view(session)
-            await callback.message.edit_text(text, reply_markup=keyboard)
+            await _safe_edit_text(callback.message, text, reply_markup=keyboard)
         await callback.answer("Kompaniya nomi topilmadi. Qaytadan boshlang.", show_alert=True)
         return
 
@@ -154,7 +156,8 @@ async def create_company_from_plan(
     except CompanyAlreadyExistsError as exc:
         await state.set_state(CompanyManagementStates.waiting_for_name)
         if callback.message is not None:
-            await callback.message.edit_text(
+            await _safe_edit_text(
+                callback.message,
                 f"{exc}\n\nBoshqa kompaniya nomini yuboring.",
                 reply_markup=build_company_cancel_keyboard(),
             )
@@ -163,7 +166,8 @@ async def create_company_from_plan(
 
     await state.clear()
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             "Kompaniya muvaffaqiyatli yaratildi.\n\n" + _format_company_details(company),
             reply_markup=build_company_actions_keyboard(company.id),
         )
@@ -202,7 +206,8 @@ async def company_details_callback(
         return
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             _format_company_details(company),
             reply_markup=build_company_actions_keyboard(company.id),
         )
@@ -227,7 +232,8 @@ async def activate_company_subscription(
         return
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             "Obuna 30 kunga aktiv qilindi.\n\n" + _format_company_details(company),
             reply_markup=build_company_actions_keyboard(company.id),
         )
@@ -256,7 +262,8 @@ async def start_bind_user_to_company(
     await state.update_data(company_id=company.id)
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             _format_company_details(company)
             + "\n\nBiriktirmoqchi bo'lgan foydalanuvchining Telegram ID raqamini yuboring.",
             reply_markup=build_company_cancel_keyboard(),
@@ -326,7 +333,8 @@ async def delete_company_callback(
 
     text, keyboard = await _build_company_list_view(session)
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             "Kompaniya o'chirildi.\n\n" + text,
             reply_markup=keyboard,
         )
@@ -420,3 +428,16 @@ def _format_plan(plan: CompanyPlan) -> str:
 
 def _format_status(company: Company) -> str:
     return "🟢 Faol" if company.is_active else "🔴 Nofaol"
+
+
+async def _safe_edit_text(
+    message: Message,
+    text: str,
+    reply_markup=None,
+) -> None:
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except TelegramBadRequest as exc:
+        if "message is not modified" in str(exc):
+            return
+        raise

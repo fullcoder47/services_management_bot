@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, User as AiogramUser
@@ -77,7 +78,8 @@ async def admin_select_company(
     await state.update_data(company_id=company.id, company_name=company.name)
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             f"👤 Admin boshqaruvi\n\nKompaniya: <b>{company.name}</b>\n\nTelegram user ID yuboring",
         )
     await callback.answer()
@@ -132,7 +134,8 @@ async def admin_select_role(
     await state.update_data(role=role.value)
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             "Tasdiqlang:\n\n"
             f"Kompaniya: <b>{company_name}</b>\n"
             f"ID: <b>{user_id}</b>\n"
@@ -182,8 +185,15 @@ async def admin_confirm_assign(
         await callback.answer(str(exc), show_alert=True)
         return
 
+    await state.clear()
     await state.set_state(AdminAssignStates.waiting_for_company)
     companies = await company_service.list_companies()
+    company_users = await user_service.get_users_by_company(company.id)
+    management_lines = [
+        f"- {item.telegram_id} | {item.role.value}"
+        for item in company_users
+        if item.role in {UserRole.ADMIN, UserRole.OPERATOR}
+    ]
 
     result_text = (
         "✅ User muvaffaqiyatli qo‘shildi:\n"
@@ -191,9 +201,12 @@ async def admin_confirm_assign(
         f"Role: <b>{user.role.value}</b>\n"
         f"Company: <b>{company.name}</b>"
     )
+    if management_lines:
+        result_text += "\n\nJoriy admin/operatorlar:\n" + "\n".join(management_lines)
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             result_text + "\n\nKompaniyani tanlang",
             reply_markup=build_admin_company_select_keyboard(companies),
         )
@@ -249,7 +262,8 @@ async def _show_admin_panel_callback(
         text = "👤 Admin boshqaruvi\n\nHali kompaniyalar mavjud emas."
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             text,
             reply_markup=build_admin_company_select_keyboard(companies) if companies else None,
         )
@@ -302,3 +316,16 @@ def _parse_assign_role(role_value: str) -> UserRole | None:
     if role_value == UserRole.OPERATOR.value:
         return UserRole.OPERATOR
     return None
+
+
+async def _safe_edit_text(
+    message: Message,
+    text: str,
+    reply_markup=None,
+) -> None:
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except TelegramBadRequest as exc:
+        if "message is not modified" in str(exc):
+            return
+        raise
