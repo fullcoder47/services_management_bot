@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from db.base import Base
-from db.models import User  # noqa: F401
+from db.models import Company, User  # noqa: F401
 
 
 class Database:
