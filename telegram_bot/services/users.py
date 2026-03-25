@@ -9,6 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db.models import User, UserRole
 
 
+class UserServiceError(Exception):
+    pass
+
+
+class UserNotFoundError(UserServiceError):
+    pass
+
+
 @dataclass(slots=True)
 class TelegramUserDTO:
     telegram_id: int
@@ -63,6 +71,19 @@ class UserService:
         await self._session.commit()
         await self._session.refresh(new_user)
         return UserRegistrationResult(user=new_user, created=True)
+
+    async def get_by_telegram_id(self, telegram_id: int) -> User | None:
+        return await self._get_by_telegram_id(telegram_id)
+
+    async def assign_company(self, telegram_id: int, company_id: int | None) -> User:
+        user = await self._get_by_telegram_id(telegram_id)
+        if user is None:
+            raise UserNotFoundError("Foydalanuvchi topilmadi. Avval botga /start yuborishi kerak.")
+
+        user.company_id = company_id
+        await self._session.commit()
+        await self._session.refresh(user)
+        return user
 
     async def _get_by_telegram_id(self, telegram_id: int) -> User | None:
         statement = select(User).where(User.telegram_id == telegram_id)

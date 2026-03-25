@@ -3,10 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.models import Company, CompanyPlan
+from db.models import Company, CompanyPlan, User
 
 
 class CompanyServiceError(Exception):
@@ -58,6 +58,13 @@ class CompanyService:
         await self._sync_subscription_state([company])
         return company
 
+    def check_access(self, company: Company) -> bool:
+        subscription_end = normalize_utc_datetime(company.subscription_end)
+        if subscription_end is None:
+            return False
+
+        return subscription_end > self._utcnow()
+
     async def create_company(self, payload: CreateCompanyDTO) -> Company:
         normalized_name = payload.name.strip()
         if not normalized_name:
@@ -84,6 +91,11 @@ class CompanyService:
         if company is None:
             return False
 
+        await self._session.execute(
+            update(User)
+            .where(User.company_id == company_id)
+            .values(company_id=None)
+        )
         await self._session.delete(company)
         await self._session.commit()
         return True
@@ -106,7 +118,7 @@ class CompanyService:
 
     async def has_access(self, company_id: int) -> bool:
         company = await self.get_company(company_id)
-        return bool(company and company.is_active)
+        return bool(company and self.check_access(company))
 
     async def _find_by_name(self, name: str) -> Company | None:
         statement = select(Company).where(func.lower(Company.name) == name.lower())
@@ -115,7 +127,6 @@ class CompanyService:
 
     async def _sync_subscription_state(self, companies: list[Company]) -> None:
         changed = False
-        now = self._utcnow()
 
         for company in companies:
             subscription_end = normalize_utc_datetime(company.subscription_end)
@@ -123,11 +134,9 @@ class CompanyService:
                 company.subscription_end = subscription_end
                 changed = True
 
-            if subscription_end is None:
-                continue
-
-            if subscription_end <= now and company.is_active:
-                company.is_active = False
+            has_access = self.check_access(company)
+            if company.is_active != has_access:
+                company.is_active = has_access
                 changed = True
 
         if changed:

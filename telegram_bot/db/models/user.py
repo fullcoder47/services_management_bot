@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from sqlalchemy import BigInteger, Boolean, Enum, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base, TimestampMixin
 
@@ -24,6 +24,11 @@ class User(Base, TimestampMixin):
     language_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    company_id: Mapped[int | None] = mapped_column(
+        ForeignKey("companies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     role: Mapped[UserRole] = mapped_column(
         Enum(
             UserRole,
@@ -34,6 +39,8 @@ class User(Base, TimestampMixin):
         default=UserRole.USER,
         nullable=False,
     )
+
+    company: Mapped["Company | None"] = relationship("Company", back_populates="users")
 
     @property
     def is_super_admin(self) -> bool:

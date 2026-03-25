@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import Boolean, DateTime, Enum, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.base import Base, TimestampMixin
 
@@ -34,3 +34,5 @@ class Company(Base, TimestampMixin):
         DateTime(timezone=False),
         nullable=True,
     )
+
+    users: Mapped[list["User"]] = relationship("User", back_populates="company")

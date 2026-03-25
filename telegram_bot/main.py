@@ -7,7 +7,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from bot.handlers import register_routers
-from bot.middlewares.db import DbSessionMiddleware
+from bot.middlewares import DbSessionMiddleware, SubscriptionMiddleware
 from core.config import Settings, load_settings
 from core.logging import configure_logging
 from db.session import Database
@@ -27,6 +27,8 @@ async def main() -> None:
     dispatcher = Dispatcher()
 
     dispatcher.update.middleware(DbSessionMiddleware(database.session_factory))
+    dispatcher.message.middleware(SubscriptionMiddleware())
+    dispatcher.callback_query.middleware(SubscriptionMiddleware())
     register_routers(dispatcher)
 
     try:
