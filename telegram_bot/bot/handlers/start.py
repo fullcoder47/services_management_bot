@@ -7,7 +7,8 @@ from aiogram.types import Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.main_menu import build_main_menu
-from services.users import TelegramUserDTO, UserService
+from db.models import UserRole
+from services.user_service import TelegramUserDTO, UserService
 
 
 router = Router(name=__name__)
@@ -29,7 +30,7 @@ async def start_handler(
         TelegramUserDTO.from_aiogram_user(message.from_user)
     )
 
-    role_text = "super admin" if registration.user.is_super_admin else "foydalanuvchi"
+    role_text = _format_role(registration.user.role)
     created_text = "ha" if registration.created else "yo'q"
     greeting = (
         f"Salom, <b>{registration.user.display_name}</b>!\n\n"
@@ -37,6 +38,19 @@ async def start_handler(
         f"Hozir ro'yxatdan o'tdingizmi: <b>{created_text}</b>."
     )
     if registration.user.is_super_admin:
-        greeting += "\n\nKompaniyalarni boshqarish uchun <b>/companies</b> yoki <b>Kompaniyalar</b> tugmasidan foydalaning."
+        greeting += (
+            "\n\nKompaniyalarni boshqarish uchun <b>/companies</b> yoki <b>Kompaniyalar</b> tugmasidan foydalaning."
+            "\nAdmin boshqaruvi uchun esa <b>👤 Adminlar</b> tugmasini bosing."
+        )
 
     await message.answer(greeting, reply_markup=build_main_menu())
+
+
+def _format_role(role: UserRole) -> str:
+    if role == UserRole.SUPER_ADMIN:
+        return "super admin"
+    if role == UserRole.ADMIN:
+        return "admin"
+    if role == UserRole.OPERATOR:
+        return "operator"
+    return "foydalanuvchi"

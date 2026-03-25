@@ -6,10 +6,11 @@ from .company_service import (
     CreateCompanyDTO,
     normalize_utc_datetime,
 )
-from .users import (
+from .user_service import (
     TelegramUserDTO,
     UserNotFoundError,
     UserRegistrationResult,
+    UserRoleChangeError,
     UserService,
     UserServiceError,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "TelegramUserDTO",
     "UserNotFoundError",
     "UserRegistrationResult",
+    "UserRoleChangeError",
     "UserService",
     "UserServiceError",
     "normalize_utc_datetime",

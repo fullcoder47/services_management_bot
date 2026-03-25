@@ -30,6 +30,7 @@ from services.company_service import (
 from services.users import (
     TelegramUserDTO,
     UserNotFoundError,
+    UserRoleChangeError,
     UserService,
 )
 
@@ -295,7 +296,7 @@ async def bind_user_to_company(
     user_service = UserService(session)
     try:
         user = await user_service.assign_company(int(telegram_id_text), company.id)
-    except UserNotFoundError as exc:
+    except (UserNotFoundError, UserRoleChangeError) as exc:
         await message.answer(str(exc))
         return
 

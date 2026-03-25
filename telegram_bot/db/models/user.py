@@ -10,6 +10,8 @@ from db.base import Base, TimestampMixin
 
 class UserRole(StrEnum):
     USER = "user"
+    OPERATOR = "operator"
+    ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
 
 

@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.company_service import CompanyService
-from services.users import UserService
+from services.user_service import UserService
 
 
 class SubscriptionMiddleware(BaseMiddleware):
@@ -27,7 +27,7 @@ class SubscriptionMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         user_service = UserService(session)
-        user = await user_service.get_by_telegram_id(telegram_user.id)
+        user = await user_service.get_user_by_telegram_id(telegram_user.id)
         if user is None:
             return await handler(event, data)
 
