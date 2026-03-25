@@ -3,11 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from dotenv import load_dotenv
 
-
-# 🔥 .env ni yuklaymiz
-load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -42,16 +38,12 @@ def _normalize_database_url(database_url: str) -> str:
 def load_settings() -> Settings:
     _load_dotenv(BASE_DIR / ".env")
 
-    # ✅ TO‘G‘RILANDI
     bot_token = os.getenv("BOT_TOKEN", "").strip()
-
     if not bot_token:
-        raise RuntimeError(
-            "BOT_TOKEN is not set. Copy .env.example to .env and provide a Telegram bot token."
-        )
+        msg = "BOT_TOKEN topilmadi. .env.example faylidan nusxa olib, .env ichiga Telegram bot tokenini kiriting."
+        raise RuntimeError(msg)
 
     database_url = _normalize_database_url(
         os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./app.db").strip()
     )
-
     return Settings(bot_token=bot_token, database_url=database_url)

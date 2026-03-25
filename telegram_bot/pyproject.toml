@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "telegram-bot-template"
 version = "0.1.0"
-description = "Clean Telegram bot starter with aiogram 3, SQLAlchemy async, and SQLite"
+description = "aiogram 3, SQLAlchemy async va SQLite bilan yozilgan Telegram bot shabloni"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -27,6 +27,16 @@ class CreateCompanyDTO:
     plan: CompanyPlan
 
 
+def normalize_utc_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+
+    if value.tzinfo is None:
+        return value
+
+    return value.astimezone(UTC).replace(tzinfo=None)
+
+
 class CompanyService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
@@ -51,11 +61,11 @@ class CompanyService:
     async def create_company(self, payload: CreateCompanyDTO) -> Company:
         normalized_name = payload.name.strip()
         if not normalized_name:
-            raise CompanyServiceError("Company name cannot be empty.")
+            raise CompanyServiceError("Kompaniya nomi bo'sh bo'lishi mumkin emas.")
 
         existing = await self._find_by_name(normalized_name)
         if existing is not None:
-            raise CompanyAlreadyExistsError("A company with this name already exists.")
+            raise CompanyAlreadyExistsError("Bu nomdagi kompaniya allaqachon mavjud.")
 
         company = Company(
             name=normalized_name,
@@ -66,6 +76,7 @@ class CompanyService:
         self._session.add(company)
         await self._session.commit()
         await self._session.refresh(company)
+        company.subscription_end = normalize_utc_datetime(company.subscription_end)
         return company
 
     async def delete_company(self, company_id: int) -> bool:
@@ -80,15 +91,17 @@ class CompanyService:
     async def activate_subscription(self, company_id: int, days: int = 30) -> Company:
         company = await self.get_company(company_id)
         if company is None:
-            raise CompanyNotFoundError("Company not found.")
+            raise CompanyNotFoundError("Kompaniya topilmadi.")
 
         now = self._utcnow()
-        base_date = company.subscription_end if company.subscription_end and company.subscription_end > now else now
+        current_end = normalize_utc_datetime(company.subscription_end)
+        base_date = current_end if current_end and current_end > now else now
         company.subscription_end = base_date + timedelta(days=days)
         company.is_active = True
 
         await self._session.commit()
         await self._session.refresh(company)
+        company.subscription_end = normalize_utc_datetime(company.subscription_end)
         return company
 
     async def has_access(self, company_id: int) -> bool:
@@ -105,10 +118,15 @@ class CompanyService:
         now = self._utcnow()
 
         for company in companies:
-            if company.subscription_end is None:
+            subscription_end = normalize_utc_datetime(company.subscription_end)
+            if company.subscription_end != subscription_end:
+                company.subscription_end = subscription_end
+                changed = True
+
+            if subscription_end is None:
                 continue
 
-            if company.subscription_end <= now and company.is_active:
+            if subscription_end <= now and company.is_active:
                 company.is_active = False
                 changed = True
 
@@ -117,4 +135,4 @@ class CompanyService:
 
     @staticmethod
     def _utcnow() -> datetime:
-        return datetime.now(UTC)
+        return datetime.now(UTC).replace(tzinfo=None)

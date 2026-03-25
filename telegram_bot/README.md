@@ -1,20 +1,20 @@
-# Telegram Bot Template
+# Telegram Bot Shabloni
 
-Clean Telegram bot starter built with:
+Toza va kengaytirishga tayyor Telegram bot loyihasi:
 
 - `aiogram 3`
 - `SQLAlchemy async`
 - `SQLite`
 
-## Features
+## Imkoniyatlar
 
-- Clean, scalable project structure
-- `/start` command
-- Auto user registration
-- First registered user becomes `super_admin`
-- Async database access with SQLAlchemy
+- Toza va kengaytiriladigan loyiha tuzilmasi
+- `/start` buyrug'i
+- Foydalanuvchini avtomatik ro'yxatdan o'tkazish
+- Birinchi foydalanuvchi `super_admin` bo'ladi
+- SQLAlchemy orqali async ma'lumotlar bazasi ishlashi
 
-## Project Structure
+## Loyiha Tuzilishi
 
 ```text
 telegram_bot/
@@ -31,20 +31,20 @@ telegram_bot/
 `-- pyproject.toml
 ```
 
-## Setup
+## Ishga Tushirish
 
-1. Create a virtual environment and activate it.
-2. Install dependencies:
+1. Virtual muhit yarating va uni faollashtiring.
+2. Kerakli kutubxonalarni o'rnating:
 
 ```bash
 pip install -e .
 ```
 
-3. Copy `.env.example` to `.env` and set your bot token.
-4. Run the bot:
+3. `.env.example` faylidan `.env` nusxa yarating va bot tokenini kiriting.
+4. Botni ishga tushiring:
 
 ```bash
 python main.py
 ```
 
-The SQLite database file is created automatically as `app.db`.
+SQLite bazasi avtomatik ravishda `app.db` fayli sifatida yaratiladi.

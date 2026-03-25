@@ -31,7 +31,6 @@ class Company(Base, TimestampMixin):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     subscription_end: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
+        DateTime(timezone=False),
         nullable=True,
     )
-

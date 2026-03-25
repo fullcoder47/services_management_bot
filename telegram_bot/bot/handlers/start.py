@@ -20,7 +20,7 @@ async def start_handler(
     session: AsyncSession,
 ) -> None:
     if message.from_user is None:
-        await message.answer("Unable to identify your Telegram account.")
+        await message.answer("Telegram profilingizni aniqlab bo'lmadi.")
         return
 
     await state.clear()
@@ -29,13 +29,14 @@ async def start_handler(
         TelegramUserDTO.from_aiogram_user(message.from_user)
     )
 
-    role_text = "super admin" if registration.user.is_super_admin else "user"
+    role_text = "super admin" if registration.user.is_super_admin else "foydalanuvchi"
+    created_text = "ha" if registration.created else "yo'q"
     greeting = (
-        f"Hello, <b>{registration.user.display_name}</b>!\n\n"
-        f"You are registered as: <b>{role_text}</b>.\n"
-        f"Created now: <b>{'yes' if registration.created else 'no'}</b>."
+        f"Salom, <b>{registration.user.display_name}</b>!\n\n"
+        f"Sizning rolingiz: <b>{role_text}</b>.\n"
+        f"Hozir ro'yxatdan o'tdingizmi: <b>{created_text}</b>."
     )
     if registration.user.is_super_admin:
-        greeting += "\n\nUse <b>/companies</b> to manage companies."
+        greeting += "\n\nKompaniyalarni boshqarish uchun <b>/companies</b> yoki <b>Kompaniyalar</b> tugmasidan foydalaning."
 
     await message.answer(greeting, reply_markup=build_main_menu())

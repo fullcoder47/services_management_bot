@@ -28,15 +28,16 @@ def build_company_list_keyboard(companies: list[Company]) -> InlineKeyboardMarku
     builder = InlineKeyboardBuilder()
 
     for company in companies:
-        status = "ACTIVE" if company.is_active else "INACTIVE"
-        button_text = f"{company.id}. {_trim_text(company.name, 20)} [{company.plan.value}|{status}]"
+        status = "FAOL" if company.is_active else "NOFAOL"
+        plan_text = "premium" if company.plan.value == "premium" else "bepul"
+        button_text = f"{company.id}. {_trim_text(company.name, 20)} [{plan_text}|{status}]"
         builder.button(
             text=button_text,
             callback_data=CompanySelectCallback(company_id=company.id),
         )
 
     builder.button(
-        text="Add company",
+        text="Kompaniya qo'shish",
         callback_data=CompanyMenuCallback(action="add"),
     )
     builder.adjust(1)
@@ -46,15 +47,15 @@ def build_company_list_keyboard(companies: list[Company]) -> InlineKeyboardMarku
 def build_company_actions_keyboard(company_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="Activate 30 days",
+        text="Obunani 30 kunga faollashtirish",
         callback_data=CompanyActionCallback(action="activate", company_id=company_id),
     )
     builder.button(
-        text="Delete company",
+        text="Kompaniyani o'chirish",
         callback_data=CompanyActionCallback(action="delete", company_id=company_id),
     )
     builder.button(
-        text="Back to list",
+        text="Ro'yxatga qaytish",
         callback_data=CompanyMenuCallback(action="list"),
     )
     builder.adjust(1)
@@ -64,7 +65,7 @@ def build_company_actions_keyboard(company_id: int) -> InlineKeyboardMarkup:
 def build_company_cancel_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="Back to list",
+        text="Ro'yxatga qaytish",
         callback_data=CompanyMenuCallback(action="list"),
     )
     builder.adjust(1)
@@ -74,7 +75,7 @@ def build_company_cancel_keyboard() -> InlineKeyboardMarkup:
 def build_company_plan_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="Free",
+        text="Bepul",
         callback_data=CompanyPlanCallback(plan="free"),
     )
     builder.button(
@@ -82,7 +83,7 @@ def build_company_plan_keyboard() -> InlineKeyboardMarkup:
         callback_data=CompanyPlanCallback(plan="premium"),
     )
     builder.button(
-        text="Cancel",
+        text="Bekor qilish",
         callback_data=CompanyMenuCallback(action="list"),
     )
     builder.adjust(2, 1)

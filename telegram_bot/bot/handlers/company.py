@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -25,6 +25,7 @@ from services.company_service import (
     CompanyNotFoundError,
     CompanyService,
     CreateCompanyDTO,
+    normalize_utc_datetime,
 )
 from services.users import TelegramUserDTO, UserService
 
@@ -38,6 +39,8 @@ class CompanyCreateStates(StatesGroup):
 
 
 @router.message(Command("companies"))
+@router.message(Command("kompaniyalar"))
+@router.message(F.text == "Kompaniyalar")
 async def companies_command(
     message: Message,
     state: FSMContext,
@@ -84,7 +87,7 @@ async def start_company_create(
 
     if callback.message is not None:
         await callback.message.edit_text(
-            "Send the company name.",
+            "Kompaniya nomini yuboring.",
             reply_markup=build_company_cancel_keyboard(),
         )
     await callback.answer()
@@ -102,13 +105,13 @@ async def capture_company_name(
 
     company_name = (message.text or "").strip()
     if not company_name:
-        await message.answer("Company name cannot be empty. Send a valid company name.")
+        await message.answer("Kompaniya nomi bo'sh bo'lishi mumkin emas. To'g'ri nom yuboring.")
         return
 
     await state.update_data(company_name=company_name)
     await state.set_state(CompanyCreateStates.waiting_for_plan)
     await message.answer(
-        "Choose the company plan.",
+        "Kompaniya tarifini tanlang.",
         reply_markup=build_company_plan_keyboard(),
     )
 
@@ -131,7 +134,7 @@ async def create_company_from_plan(
         if callback.message is not None:
             text, keyboard = await _build_company_list_view(session)
             await callback.message.edit_text(text, reply_markup=keyboard)
-        await callback.answer("Company name was lost. Start again.", show_alert=True)
+        await callback.answer("Kompaniya nomi topilmadi. Qaytadan boshlang.", show_alert=True)
         return
 
     company_service = CompanyService(session)
@@ -146,19 +149,19 @@ async def create_company_from_plan(
         await state.set_state(CompanyCreateStates.waiting_for_name)
         if callback.message is not None:
             await callback.message.edit_text(
-                f"{exc}\n\nSend a different company name.",
+                f"{exc}\n\nBoshqa kompaniya nomini yuboring.",
                 reply_markup=build_company_cancel_keyboard(),
             )
-        await callback.answer("Company name already exists.", show_alert=True)
+        await callback.answer("Kompaniya nomi allaqachon mavjud.", show_alert=True)
         return
 
     await state.clear()
     if callback.message is not None:
         await callback.message.edit_text(
-            "Company created successfully.\n\n" + _format_company_details(company),
+            "Kompaniya muvaffaqiyatli yaratildi.\n\n" + _format_company_details(company),
             reply_markup=build_company_actions_keyboard(company.id),
         )
-    await callback.answer("Company created.")
+    await callback.answer("Kompaniya yaratildi.")
 
 
 @router.message(CompanyCreateStates.waiting_for_plan)
@@ -171,7 +174,7 @@ async def waiting_for_plan_hint(
         return
 
     await message.answer(
-        "Use the inline buttons to choose a plan.",
+        "Tarifni tanlash uchun pastdagi inline tugmalardan foydalaning.",
         reply_markup=build_company_plan_keyboard(),
     )
 
@@ -189,7 +192,7 @@ async def company_details_callback(
     company_service = CompanyService(session)
     company = await company_service.get_company(callback_data.company_id)
     if company is None:
-        await callback.answer("Company not found.", show_alert=True)
+        await callback.answer("Kompaniya topilmadi.", show_alert=True)
         return
 
     if callback.message is not None:
@@ -219,10 +222,10 @@ async def activate_company_subscription(
 
     if callback.message is not None:
         await callback.message.edit_text(
-            "Subscription activated for 30 days.\n\n" + _format_company_details(company),
+            "Obuna 30 kunga faollashtirildi.\n\n" + _format_company_details(company),
             reply_markup=build_company_actions_keyboard(company.id),
         )
-    await callback.answer("Subscription activated.")
+    await callback.answer("Obuna faollashtirildi.")
 
 
 @router.callback_query(CompanyActionCallback.filter(F.action == "delete"))
@@ -238,32 +241,32 @@ async def delete_company_callback(
     company_service = CompanyService(session)
     deleted = await company_service.delete_company(callback_data.company_id)
     if not deleted:
-        await callback.answer("Company not found.", show_alert=True)
+        await callback.answer("Kompaniya topilmadi.", show_alert=True)
         return
 
     text, keyboard = await _build_company_list_view(session)
     if callback.message is not None:
         await callback.message.edit_text(
-            "Company deleted.\n\n" + text,
+            "Kompaniya o'chirildi.\n\n" + text,
             reply_markup=keyboard,
         )
-    await callback.answer("Company deleted.")
+    await callback.answer("Kompaniya o'chirildi.")
 
 
 async def _build_company_list_view(session: AsyncSession) -> tuple[str, InlineKeyboardMarkup]:
     company_service = CompanyService(session)
     companies = await company_service.list_companies()
 
-    lines = ["<b>Company management</b>", ""]
+    lines = ["<b>Kompaniyalar boshqaruvi</b>", ""]
     if not companies:
-        lines.append("No companies created yet.")
+        lines.append("Hali kompaniyalar yaratilmagan.")
     else:
-        lines.append("Companies:")
+        lines.append("Kompaniyalar ro'yxati:")
         for company in companies:
-            status = "active" if company.is_active else "inactive"
-            access = "allowed" if company.is_active else "blocked"
+            status = "faol" if company.is_active else "nofaol"
+            access = "ruxsat berilgan" if company.is_active else "bloklangan"
             lines.append(
-                f"{company.id}. <b>{company.name}</b> | {company.plan.value} | {status} | access {access}"
+                f"{company.id}. <b>{company.name}</b> | {_format_plan(company.plan)} | {status} | kirish: {access}"
             )
 
     return "\n".join(lines), build_company_list_keyboard(companies)
@@ -274,12 +277,12 @@ async def _authorize_super_admin_message(
     session: AsyncSession,
 ) -> User | None:
     if message.from_user is None:
-        await message.answer("Unable to identify your Telegram account.")
+        await message.answer("Telegram profilingizni aniqlab bo'lmadi.")
         return None
 
     user = await _register_and_get_user(message.from_user, session)
     if user is None or not user.is_super_admin:
-        await message.answer("Only super admins can manage companies.")
+        await message.answer("Kompaniyalarni faqat super admin boshqara oladi.")
         return None
     return user
 
@@ -289,12 +292,12 @@ async def _authorize_super_admin_callback(
     session: AsyncSession,
 ) -> User | None:
     if callback.from_user is None:
-        await callback.answer("Unable to identify your Telegram account.", show_alert=True)
+        await callback.answer("Telegram profilingizni aniqlab bo'lmadi.", show_alert=True)
         return None
 
     user = await _register_and_get_user(callback.from_user, session)
     if user is None or not user.is_super_admin:
-        await callback.answer("Only super admins can manage companies.", show_alert=True)
+        await callback.answer("Kompaniyalarni faqat super admin boshqara oladi.", show_alert=True)
         return None
     return user
 
@@ -311,20 +314,26 @@ async def _register_and_get_user(
 
 
 def _format_company_details(company: Company) -> str:
-    access_text = "allowed" if company.is_active else "blocked"
+    access_text = "ruxsat berilgan" if company.is_active else "bloklangan"
     return (
-        f"<b>Company #{company.id}</b>\n"
-        f"Name: <b>{company.name}</b>\n"
-        f"Plan: <b>{company.plan.value}</b>\n"
-        f"Active: <b>{'yes' if company.is_active else 'no'}</b>\n"
-        f"Subscription end: <b>{_format_subscription_end(company.subscription_end)}</b>\n"
-        f"Access: <b>{access_text}</b>"
+        f"<b>Kompaniya #{company.id}</b>\n"
+        f"Nomi: <b>{company.name}</b>\n"
+        f"Tarifi: <b>{_format_plan(company.plan)}</b>\n"
+        f"Holati: <b>{'faol' if company.is_active else 'nofaol'}</b>\n"
+        f"Obuna muddati: <b>{_format_subscription_end(company.subscription_end)}</b>\n"
+        f"Kirish: <b>{access_text}</b>"
     )
 
 
 def _format_subscription_end(subscription_end: datetime | None) -> str:
-    if subscription_end is None:
-        return "not activated"
+    normalized = normalize_utc_datetime(subscription_end)
+    if normalized is None:
+        return "faollashtirilmagan"
 
-    normalized = subscription_end if subscription_end.tzinfo else subscription_end.replace(tzinfo=UTC)
-    return normalized.astimezone(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    return normalized.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _format_plan(plan: CompanyPlan) -> str:
+    if plan == CompanyPlan.PREMIUM:
+        return "premium"
+    return "bepul"
