@@ -51,6 +51,10 @@ def build_company_actions_keyboard(company_id: int) -> InlineKeyboardMarkup:
         callback_data=CompanyActionCallback(action="activate", company_id=company_id),
     )
     builder.button(
+        text="⛔ Obunani bekor qilish",
+        callback_data=CompanyActionCallback(action="deactivate", company_id=company_id),
+    )
+    builder.button(
         text="👤 Foydalanuvchini biriktirish",
         callback_data=CompanyActionCallback(action="bind_user", company_id=company_id),
     )

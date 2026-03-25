@@ -30,13 +30,16 @@ async def start_handler(
         TelegramUserDTO.from_aiogram_user(message.from_user)
     )
 
-    role_text = _format_role(registration.user.role)
-    created_text = "ha" if registration.created else "yo'q"
     greeting = (
         f"Salom, <b>{registration.user.display_name}</b>!\n\n"
-        f"Sizning rolingiz: <b>{role_text}</b>.\n"
-        f"Hozir ro'yxatdan o'tdingizmi: <b>{created_text}</b>."
+        f"Sizning rolingiz: <b>{_format_role(registration.user.role)}</b>.\n"
     )
+    greeting += (
+        "Siz botda muvaffaqiyatli ro'yxatdan o'tdingiz."
+        if registration.created
+        else "Siz allaqachon ro'yxatdan o'tgansiz."
+    )
+
     if registration.user.is_super_admin:
         greeting += (
             "\n\nKompaniyalarni boshqarish uchun <b>/companies</b> yoki <b>Kompaniyalar</b> tugmasidan foydalaning."

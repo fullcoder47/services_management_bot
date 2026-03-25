@@ -32,10 +32,7 @@ def build_admin_company_select_keyboard(companies: list[Company]) -> InlineKeybo
             callback_data=AdminCompanyCallback(company_id=company.id),
         )
 
-    builder.button(
-        text="⬅️ Orqaga",
-        callback_data=AdminMenuCallback(action="cancel"),
-    )
+    builder.button(text="⬅️ Orqaga", callback_data=AdminMenuCallback(action="cancel"))
     builder.adjust(1)
     return builder.as_markup()
 
@@ -50,10 +47,7 @@ def build_admin_role_select_keyboard() -> InlineKeyboardMarkup:
         text="🛠 Operator",
         callback_data=AdminRoleCallback(role="operator"),
     )
-    builder.button(
-        text="⬅️ Orqaga",
-        callback_data=AdminMenuCallback(action="cancel"),
-    )
+    builder.button(text="⬅️ Orqaga", callback_data=AdminMenuCallback(action="cancel"))
     builder.adjust(1)
     return builder.as_markup()
 
@@ -68,5 +62,12 @@ def build_admin_confirm_keyboard() -> InlineKeyboardMarkup:
         text="⬅️ Bekor qilish",
         callback_data=AdminConfirmCallback(action="cancel"),
     )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_admin_cancel_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="⬅️ Orqaga", callback_data=AdminMenuCallback(action="cancel"))
     builder.adjust(1)
     return builder.as_markup()
