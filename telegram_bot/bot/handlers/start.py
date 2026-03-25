@@ -46,7 +46,10 @@ async def start_handler(
             "\nAdmin boshqaruvi uchun esa <b>👤 Adminlar</b> tugmasini bosing."
         )
 
-    await message.answer(greeting, reply_markup=build_main_menu())
+    await message.answer(
+        greeting,
+        reply_markup=build_main_menu(is_super_admin=registration.user.is_super_admin),
+    )
 
 
 def _format_role(role: UserRole) -> str:
