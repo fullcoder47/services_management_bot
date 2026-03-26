@@ -30,9 +30,10 @@ async def start_handler(
         TelegramUserDTO.from_aiogram_user(message.from_user)
     )
 
+    user = registration.user
     greeting = (
-        f"Salom, <b>{registration.user.display_name}</b>!\n\n"
-        f"Sizning rolingiz: <b>{_format_role(registration.user.role)}</b>.\n"
+        f"Salom, <b>{user.display_name}</b>!\n\n"
+        f"Sizning rolingiz: <b>{_format_role(user.role)}</b>.\n"
     )
     greeting += (
         "Siz botda muvaffaqiyatli ro'yxatdan o'tdingiz."
@@ -40,15 +41,25 @@ async def start_handler(
         else "Siz allaqachon ro'yxatdan o'tgansiz."
     )
 
-    if registration.user.is_super_admin:
+    if user.is_super_admin:
         greeting += (
             "\n\nKompaniyalarni boshqarish uchun <b>/companies</b> yoki <b>Kompaniyalar</b> tugmasidan foydalaning."
             "\nAdmin boshqaruvi uchun esa <b>👤 Adminlar</b> tugmasini bosing."
         )
+    elif user.role in {UserRole.ADMIN, UserRole.OPERATOR}:
+        greeting += (
+            "\n\nArizalarni ko'rish uchun <b>📥 Arizalar</b> tugmasidan foydalaning."
+        )
+        if user.company_id is not None:
+            greeting += "\nYangi ariza yuborish uchun <b>📝 Ariza qoldirish</b> tugmasi ham faol."
+    elif user.company_id is not None:
+        greeting += "\n\nYangi ariza yuborish uchun <b>📝 Ariza qoldirish</b> tugmasidan foydalaning."
+    else:
+        greeting += "\n\nSiz hali kompaniyaga biriktirilmagansiz."
 
     await message.answer(
         greeting,
-        reply_markup=build_main_menu(is_super_admin=registration.user.is_super_admin),
+        reply_markup=build_main_menu(role=user.role, has_company=user.company_id is not None),
     )
 
 

@@ -4,7 +4,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from db.base import Base
-from db.models import Company, User  # noqa: F401
+from db.models import Company, Request, User  # noqa: F401
 
 
 class Database:
@@ -28,11 +28,44 @@ class Database:
     def _run_sqlite_migrations(connection) -> None:
         inspector = inspect(connection)
         table_names = set(inspector.get_table_names())
-        if "users" not in table_names:
-            return
+        if "users" in table_names:
+            user_columns = {column["name"] for column in inspector.get_columns("users")}
+            if "company_id" not in user_columns:
+                connection.execute(text("ALTER TABLE users ADD COLUMN company_id INTEGER"))
 
-        user_columns = {column["name"] for column in inspector.get_columns("users")}
-        if "company_id" not in user_columns:
-            connection.execute(text("ALTER TABLE users ADD COLUMN company_id INTEGER"))
+            connection.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_users_company_id ON users (company_id)")
+            )
 
-        connection.execute(text("CREATE INDEX IF NOT EXISTS ix_users_company_id ON users (company_id)"))
+        if "requests" in table_names:
+            request_columns = {column["name"] for column in inspector.get_columns("requests")}
+            if "status" not in request_columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE requests ADD COLUMN status VARCHAR(32) "
+                        "NOT NULL DEFAULT 'pending'"
+                    )
+                )
+            if "result_text" not in request_columns:
+                connection.execute(text("ALTER TABLE requests ADD COLUMN result_text TEXT"))
+            if "result_image" not in request_columns:
+                connection.execute(
+                    text(
+                        "ALTER TABLE requests ADD COLUMN result_image VARCHAR(512) "
+                        "NOT NULL DEFAULT ''"
+                    )
+                )
+            if "completed_at" not in request_columns:
+                connection.execute(text("ALTER TABLE requests ADD COLUMN completed_at DATETIME"))
+            if "company_id" not in request_columns:
+                connection.execute(text("ALTER TABLE requests ADD COLUMN company_id INTEGER"))
+
+            connection.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_requests_user_id ON requests (user_id)")
+            )
+            connection.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_requests_company_id ON requests (company_id)")
+            )
+            connection.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_requests_status ON requests (status)")
+            )

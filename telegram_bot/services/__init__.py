@@ -6,6 +6,16 @@ from .company_service import (
     CreateCompanyDTO,
     normalize_utc_datetime,
 )
+from .request_service import (
+    CompleteRequestDTO,
+    CreateRequestDTO,
+    RequestAccessDeniedError,
+    RequestNotFoundError,
+    RequestService,
+    RequestServiceError,
+    RequestStateError,
+    RequestValidationError,
+)
 from .user_service import (
     TelegramUserDTO,
     UserNotFoundError,
@@ -20,7 +30,15 @@ __all__ = [
     "CompanyNotFoundError",
     "CompanyService",
     "CompanyServiceError",
+    "CompleteRequestDTO",
     "CreateCompanyDTO",
+    "CreateRequestDTO",
+    "RequestAccessDeniedError",
+    "RequestNotFoundError",
+    "RequestService",
+    "RequestServiceError",
+    "RequestStateError",
+    "RequestValidationError",
     "TelegramUserDTO",
     "UserNotFoundError",
     "UserRegistrationResult",

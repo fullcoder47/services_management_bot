@@ -43,6 +43,7 @@ class User(Base, TimestampMixin):
     )
 
     company: Mapped["Company | None"] = relationship("Company", back_populates="users")
+    requests: Mapped[list["Request"]] = relationship("Request", back_populates="user")
 
     @property
     def is_super_admin(self) -> bool:

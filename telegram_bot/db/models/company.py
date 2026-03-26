@@ -36,3 +36,4 @@ class Company(Base, TimestampMixin):
     )
 
     users: Mapped[list["User"]] = relationship("User", back_populates="company")
+    requests: Mapped[list["Request"]] = relationship("Request", back_populates="company")
