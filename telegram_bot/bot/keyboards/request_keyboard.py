@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import InlineKeyboardMarkup
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from db.models import Request, RequestStatus
+
+
+REQUEST_CREATE_CANCEL_TEXT = "❌ Bekor qilish"
 
 
 class RequestMenuCallback(CallbackData, prefix="request_menu"):
@@ -25,8 +28,39 @@ class RequestDoneConfirmCallback(CallbackData, prefix="request_done_confirm"):
     request_id: int
 
 
+def build_request_phone_keyboard() -> ReplyKeyboardMarkup:
+    builder = ReplyKeyboardBuilder()
+    builder.add(
+        KeyboardButton(
+            text="📱 Telefonni yuborish",
+            request_contact=True,
+        )
+    )
+    builder.add(KeyboardButton(text=REQUEST_CREATE_CANCEL_TEXT))
+    builder.adjust(1)
+    return builder.as_markup(
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        input_field_placeholder="Telefon raqamingizni yuboring",
+    )
+
+
 def build_request_create_cancel_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    builder.button(
+        text="⬅️ Bekor qilish",
+        callback_data=RequestMenuCallback(action="cancel_create"),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_request_optional_image_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text="⏭️ O‘tkazib yuborish",
+        callback_data=RequestMenuCallback(action="skip_image"),
+    )
     builder.button(
         text="⬅️ Bekor qilish",
         callback_data=RequestMenuCallback(action="cancel_create"),
@@ -93,19 +127,9 @@ def build_request_list_keyboard(requests: list[Request]) -> InlineKeyboardMarkup
     return builder.as_markup()
 
 
-def build_request_admin_list_back_keyboard() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(
-        text="⬅️ Orqaga",
-        callback_data=RequestMenuCallback(action="list"),
-    )
-    builder.adjust(1)
-    return builder.as_markup()
-
-
 def _status_icon(status: RequestStatus) -> str:
     if status == RequestStatus.PENDING:
-        return "🆕"
+        return "⏳"
     if status == RequestStatus.IN_PROGRESS:
         return "🛠"
     return "✅"

@@ -59,6 +59,8 @@ class Database:
                 connection.execute(text("ALTER TABLE requests ADD COLUMN completed_at DATETIME"))
             if "company_id" not in request_columns:
                 connection.execute(text("ALTER TABLE requests ADD COLUMN company_id INTEGER"))
+            if "problem_image" not in request_columns:
+                connection.execute(text("ALTER TABLE requests ADD COLUMN problem_image VARCHAR(512)"))
 
             connection.execute(
                 text("CREATE INDEX IF NOT EXISTS ix_requests_user_id ON requests (user_id)")

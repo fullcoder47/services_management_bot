@@ -1,4 +1,5 @@
 from .user_service import (
+    UserAccessError,
     TelegramUserDTO,
     UserNotFoundError,
     UserRegistrationResult,
@@ -9,6 +10,7 @@ from .user_service import (
 
 __all__ = [
     "TelegramUserDTO",
+    "UserAccessError",
     "UserNotFoundError",
     "UserRegistrationResult",
     "UserRoleChangeError",

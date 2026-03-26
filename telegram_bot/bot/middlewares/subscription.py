@@ -12,7 +12,8 @@ from services.user_service import UserService
 
 
 class SubscriptionMiddleware(BaseMiddleware):
-    block_text = "❌ Xizmat vaqtincha to‘xtatilgan. To‘lovni amalga oshiring."
+    block_text = "❌ Bu kompaniya vaqtincha faol emas."
+    allowed_support_commands = {"/help", "/yordam", "yordam"}
 
     async def __call__(
         self,
@@ -32,6 +33,9 @@ class SubscriptionMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         data["current_user"] = user
+
+        if self._is_support_request(event):
+            return await handler(event, data)
 
         if user.is_super_admin or user.company_id is None:
             return await handler(event, data)
@@ -57,3 +61,15 @@ class SubscriptionMiddleware(BaseMiddleware):
 
         if isinstance(event, Message):
             await event.answer(self.block_text)
+
+    def _is_support_request(self, event: TelegramObject) -> bool:
+        if not isinstance(event, Message):
+            return False
+
+        text = (event.text or "").strip().lower()
+        if not text:
+            return False
+
+        command = text.split(maxsplit=1)[0]
+        command = command.split("@", maxsplit=1)[0]
+        return command in self.allowed_support_commands

@@ -31,6 +31,7 @@ class Request(Base, TimestampMixin):
     )
     phone: Mapped[str] = mapped_column(String(32), nullable=False)
     problem_text: Mapped[str] = mapped_column(Text, nullable=False)
+    problem_image: Mapped[str | None] = mapped_column(String(512), nullable=True)
     status: Mapped[RequestStatus] = mapped_column(
         Enum(
             RequestStatus,

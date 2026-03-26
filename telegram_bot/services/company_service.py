@@ -48,6 +48,10 @@ class CompanyService:
         await self._sync_subscription_state(companies)
         return companies
 
+    async def list_active_companies(self) -> list[Company]:
+        companies = await self.list_companies()
+        return [company for company in companies if self.check_access(company)]
+
     async def get_company(self, company_id: int) -> Company | None:
         statement = select(Company).where(Company.id == company_id)
         result = await self._session.execute(statement)
@@ -56,6 +60,12 @@ class CompanyService:
             return None
 
         await self._sync_subscription_state([company])
+        return company
+
+    async def get_active_company(self, company_id: int) -> Company | None:
+        company = await self.get_company(company_id)
+        if company is None or not self.check_access(company):
+            return None
         return company
 
     def check_access(self, company: Company) -> bool:

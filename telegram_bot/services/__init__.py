@@ -18,6 +18,7 @@ from .request_service import (
 )
 from .user_service import (
     TelegramUserDTO,
+    UserAccessError,
     UserNotFoundError,
     UserRegistrationResult,
     UserRoleChangeError,
@@ -40,6 +41,7 @@ __all__ = [
     "RequestStateError",
     "RequestValidationError",
     "TelegramUserDTO",
+    "UserAccessError",
     "UserNotFoundError",
     "UserRegistrationResult",
     "UserRoleChangeError",

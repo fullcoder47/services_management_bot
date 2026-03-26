@@ -119,7 +119,7 @@ async def admin_capture_user_id(
 
     user_id_text = (message.text or "").strip()
     if not user_id_text.isdigit():
-        await message.answer("Telegram user ID noto‘g‘ri. Faqat raqam kiriting.")
+        await message.answer("Telegram user ID noto'g'ri. Faqat raqam kiriting.")
         return
 
     await state.update_data(user_id=int(user_id_text))
@@ -143,7 +143,7 @@ async def admin_select_role(
 
     role = _parse_assign_role(callback_data.role)
     if role is None:
-        await callback.answer("Rol noto‘g‘ri.", show_alert=True)
+        await callback.answer("Rol noto'g'ri.", show_alert=True)
         return
 
     data = await state.get_data()
@@ -190,7 +190,7 @@ async def admin_confirm_assign(
     role = _parse_assign_role(role_value)
     if role is None:
         await state.clear()
-        await callback.answer("Rol noto‘g‘ri.", show_alert=True)
+        await callback.answer("Rol noto'g'ri.", show_alert=True)
         return
 
     company_service = CompanyService(session)
@@ -213,7 +213,7 @@ async def admin_confirm_assign(
     management_text = await _build_company_management_text(session, company)
 
     result_text = (
-        "✅ User muvaffaqiyatli qo‘shildi:\n"
+        "✅ User muvaffaqiyatli qo'shildi:\n"
         f"ID: <b>{user.telegram_id}</b>\n"
         f"Rol: <b>{user.role.value}</b>\n"
         f"Kompaniya: <b>{escape(company.name)}</b>"
@@ -279,7 +279,7 @@ async def _build_admin_panel_view(
     lines = [
         "👤 Admin boshqaruvi",
         "",
-        "Kompaniyani tanlang yoki pastdagi tugma orqali ro‘yxatni oching.",
+        "Kompaniyani tanlang yoki pastdagi tugma orqali adminlar ro'yxatini oching.",
     ]
     if not companies:
         lines.extend(["", "Hali kompaniyalar mavjud emas."])
@@ -297,7 +297,7 @@ async def _build_admin_assignments_view(
         [company.id for company in companies]
     )
 
-    lines = ["📋 Qo‘shilgan adminlar ro‘yxati", ""]
+    lines = ["📋 Qo'shilgan adminlar ro'yxati", ""]
     if not companies:
         lines.append("Hali kompaniyalar mavjud emas.")
     else:
@@ -347,8 +347,8 @@ async def _authorize_super_admin_message(
         return None
 
     user = await _register_and_get_user(message.from_user, session)
-    if user is None or user.role != UserRole.SUPER_ADMIN:
-        await message.answer("Bu bo‘limga faqat super admin kira oladi.")
+    if user.role != UserRole.SUPER_ADMIN:
+        await message.answer("Bu bo'limga faqat super admin kira oladi.")
         return None
     return user
 
@@ -362,8 +362,8 @@ async def _authorize_super_admin_callback(
         return None
 
     user = await _register_and_get_user(callback.from_user, session)
-    if user is None or user.role != UserRole.SUPER_ADMIN:
-        await callback.answer("Bu bo‘limga faqat super admin kira oladi.", show_alert=True)
+    if user.role != UserRole.SUPER_ADMIN:
+        await callback.answer("Bu bo'limga faqat super admin kira oladi.", show_alert=True)
         return None
     return user
 
@@ -371,7 +371,7 @@ async def _authorize_super_admin_callback(
 async def _register_and_get_user(
     telegram_user: AiogramUser,
     session: AsyncSession,
-) -> User | None:
+) -> User:
     user_service = UserService(session)
     registration = await user_service.register_or_update(
         TelegramUserDTO.from_aiogram_user(telegram_user)

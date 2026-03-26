@@ -36,7 +36,7 @@ router = Router(name=__name__)
 
 
 @router.message(Command("requests"))
-@router.message(F.text == "📥 Arizalar")
+@router.message(F.text == "📩 Arizalar")
 async def requests_panel_entry(
     message: Message,
     state: FSMContext,
@@ -108,11 +108,7 @@ async def request_accept_callback(
     request_service = RequestService(session)
     try:
         request = await request_service.set_in_progress(callback_data.request_id, current_user)
-    except (
-        RequestNotFoundError,
-        RequestAccessDeniedError,
-        RequestStateError,
-    ) as exc:
+    except (RequestNotFoundError, RequestAccessDeniedError, RequestStateError) as exc:
         await callback.answer(str(exc), show_alert=True)
         return
 
@@ -364,17 +360,18 @@ async def _build_request_list_view(
     request_service = RequestService(session)
     requests = await request_service.list_requests_for_manager(actor)
 
-    lines = ["📥 Arizalar", ""]
+    lines = ["📩 Arizalar", ""]
     if not requests:
         lines.append("Hozircha arizalar yo'q.")
         return "\n".join(lines), None
 
     lines.append("Arizani tanlang:")
     lines.append("")
-    for request in requests[:10]:
+    for request in requests[:20]:
+        company_name = request.company.name if request.company is not None else "Noma'lum kompaniya"
         user_name = request.user.display_name if request.user is not None else "Noma'lum"
         lines.append(
-            f"#{request.id} | {RequestService.format_status(request.status)} | {escape(user_name)}"
+            f"#{request.id} | {RequestService.format_status(request.status)} | {escape(user_name)} | {escape(company_name)}"
         )
 
     return "\n".join(lines), build_request_list_keyboard(requests)
@@ -382,13 +379,17 @@ async def _build_request_list_view(
 
 def _format_request_detail(request: Request) -> str:
     user_name = request.user.display_name if request.user is not None else "Noma'lum"
+    company_name = request.company.name if request.company is not None else "Noma'lum kompaniya"
     lines = [
         f"<b>Ariza #{request.id}</b>",
         f"Holati: <b>{RequestService.format_status(request.status)}</b>",
+        f"🏢 Kompaniya: <b>{escape(company_name)}</b>",
         f"👤 User: <b>{escape(user_name)}</b>",
         f"📞 Telefon: <b>{escape(request.phone)}</b>",
         f"📝 Muammo: <b>{escape(request.problem_text)}</b>",
     ]
+    if request.problem_image:
+        lines.append("📷 Muammo rasmi: <b>biriktirilgan</b>")
     if request.status == RequestStatus.DONE:
         lines.append(f"📝 Yakuniy izoh: <b>{escape(request.result_text or '')}</b>")
         if request.completed_at is not None:
@@ -447,7 +448,7 @@ async def _authorize_manager_message(
         await message.answer(str(exc))
         return None
 
-    if user.company_id is None:
+    if not user.is_super_admin and user.company_id is None:
         await message.answer("Siz kompaniyaga biriktirilmagansiz.")
         return None
     return user
@@ -469,7 +470,7 @@ async def _authorize_manager_callback(
         await callback.answer(str(exc), show_alert=True)
         return None
 
-    if user.company_id is None:
+    if not user.is_super_admin and user.company_id is None:
         await callback.answer("Siz kompaniyaga biriktirilmagansiz.", show_alert=True)
         return None
     return user

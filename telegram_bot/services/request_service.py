@@ -36,6 +36,7 @@ class CreateRequestDTO:
     company_id: int
     phone: str
     problem_text: str
+    problem_image: str | None = None
 
 
 @dataclass(slots=True)
@@ -51,6 +52,7 @@ class RequestService:
     async def create_request(self, payload: CreateRequestDTO) -> Request:
         phone = payload.phone.strip()
         problem_text = payload.problem_text.strip()
+        problem_image = payload.problem_image.strip() if isinstance(payload.problem_image, str) else None
 
         if not phone:
             raise RequestValidationError("Telefon raqami majburiy.")
@@ -62,6 +64,7 @@ class RequestService:
             company_id=payload.company_id,
             phone=phone,
             problem_text=problem_text,
+            problem_image=problem_image or None,
             status=RequestStatus.PENDING,
             result_text=None,
             result_image="",
@@ -90,10 +93,14 @@ class RequestService:
             raise RequestNotFoundError("Ariza topilmadi.")
         return request
 
+    async def get_request_for_user(self, request_id: int, actor: User) -> Request:
+        request = await self.get_request_or_raise(request_id)
+        if request.user_id != actor.id:
+            raise RequestAccessDeniedError("Siz bu arizani ko'ra olmaysiz.")
+        return request
+
     async def list_requests_for_manager(self, actor: User) -> list[Request]:
         self.ensure_can_manage_requests(actor)
-        if actor.company_id is None:
-            return []
 
         statement = (
             select(Request)
@@ -101,9 +108,14 @@ class RequestService:
                 selectinload(Request.user),
                 selectinload(Request.company),
             )
-            .where(Request.company_id == actor.company_id)
             .order_by(Request.created_at.desc(), Request.id.desc())
         )
+
+        if not actor.is_super_admin:
+            if actor.company_id is None:
+                return []
+            statement = statement.where(Request.company_id == actor.company_id)
+
         result = await self._session.execute(statement)
         return list(result.scalars().all())
 
@@ -172,21 +184,23 @@ class RequestService:
         return await self.get_request_or_raise(request.id)
 
     def ensure_can_manage_requests(self, actor: User) -> None:
-        if actor.role not in {UserRole.ADMIN, UserRole.OPERATOR}:
-            raise RequestAccessDeniedError("Bu bo'lim faqat admin va operator uchun.")
+        if actor.role not in {UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OPERATOR}:
+            raise RequestAccessDeniedError("Bu bo'lim faqat super admin, admin va operator uchun.")
 
     def ensure_management_access(self, actor: User, request: Request) -> None:
         self.ensure_can_manage_requests(actor)
+        if actor.is_super_admin:
+            return
         if actor.company_id is None or request.company_id != actor.company_id:
             raise RequestAccessDeniedError("Siz bu arizani boshqara olmaysiz.")
 
     @staticmethod
     def format_status(status: RequestStatus) -> str:
         if status == RequestStatus.PENDING:
-            return "🆕 Kutilmoqda"
+            return "⏳ Kutilmoqda"
         if status == RequestStatus.IN_PROGRESS:
             return "🛠 Jarayonda"
-        return "✅ Bajarildi"
+        return "✅ Bajarilgan"
 
     @staticmethod
     def _utcnow() -> datetime:

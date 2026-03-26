@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from aiogram.types import User as AiogramUser
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from db.models import User, UserRole
+from db.models import Company, User, UserRole
 
 
 class UserServiceError(Exception):
@@ -19,6 +20,10 @@ class UserNotFoundError(UserServiceError):
 
 
 class UserRoleChangeError(UserServiceError):
+    pass
+
+
+class UserAccessError(UserServiceError):
     pass
 
 
@@ -47,6 +52,12 @@ class TelegramUserDTO:
 class UserRegistrationResult:
     user: User
     created: bool
+
+
+@dataclass(slots=True)
+class CompanyAdminContacts:
+    company: Company
+    admins: list[User]
 
 
 class UserService:
@@ -88,6 +99,54 @@ class UserService:
         result = await self._session.execute(statement)
         return list(result.scalars().all())
 
+    async def list_users_for_actor(self, actor: User) -> list[User]:
+        if actor.is_super_admin:
+            statement = (
+                select(User)
+                .options(selectinload(User.company))
+                .order_by(
+                    User.company_id.asc(),
+                    User.role.asc(),
+                    User.id.asc(),
+                )
+            )
+            result = await self._session.execute(statement)
+            return list(result.scalars().all())
+
+        if actor.role == UserRole.ADMIN and actor.company_id is not None:
+            statement = (
+                select(User)
+                .options(selectinload(User.company))
+                .where(User.company_id == actor.company_id)
+                .order_by(User.id.asc())
+            )
+            result = await self._session.execute(statement)
+            return list(result.scalars().all())
+
+        raise UserAccessError("Bu bo'lim faqat super admin va admin uchun.")
+
+    async def get_broadcast_recipients(self, actor: User) -> list[User]:
+        if actor.is_super_admin:
+            statement = (
+                select(User)
+                .where(User.role != UserRole.SUPER_ADMIN)
+                .where(User.id != actor.id)
+                .order_by(User.company_id.asc(), User.id.asc())
+            )
+            result = await self._session.execute(statement)
+            return list(result.scalars().all())
+
+        if actor.role == UserRole.ADMIN and actor.company_id is not None:
+            statement = (
+                select(User)
+                .where(User.company_id == actor.company_id, User.id != actor.id)
+                .order_by(User.id.asc())
+            )
+            result = await self._session.execute(statement)
+            return list(result.scalars().all())
+
+        raise UserAccessError("Xabar yuborish faqat super admin va admin uchun.")
+
     async def get_management_users_by_company_ids(
         self,
         company_ids: list[int],
@@ -117,6 +176,25 @@ class UserService:
             summary[user.company_id][user.role].append(user)
 
         return dict(summary)
+
+    async def get_company_admin_contacts(self) -> list[CompanyAdminContacts]:
+        statement = (
+            select(Company)
+            .options(selectinload(Company.users))
+            .order_by(Company.name.asc(), Company.id.asc())
+        )
+        result = await self._session.execute(statement)
+        companies = list(result.scalars().all())
+
+        contacts: list[CompanyAdminContacts] = []
+        for company in companies:
+            admins = sorted(
+                [user for user in company.users if user.role == UserRole.ADMIN],
+                key=lambda user: (user.first_name.lower(), user.id),
+            )
+            contacts.append(CompanyAdminContacts(company=company, admins=admins))
+
+        return contacts
 
     async def assign_user_to_company(self, user_id: int, company_id: int, role: UserRole) -> User:
         if role == UserRole.SUPER_ADMIN:
@@ -155,6 +233,22 @@ class UserService:
 
         if user.is_super_admin and company_id is not None:
             raise UserRoleChangeError("Super adminni kompaniyaga biriktirib bo'lmaydi.")
+
+        user.company_id = company_id
+        await self._session.commit()
+        await self._session.refresh(user)
+        return user
+
+    async def select_company_for_user(self, telegram_id: int, company_id: int) -> User:
+        user = await self._get_by_telegram_id(telegram_id)
+        if user is None:
+            raise UserNotFoundError("Foydalanuvchi topilmadi. Avval /start yuboring.")
+
+        if user.is_super_admin:
+            raise UserRoleChangeError("Super admin kompaniya tanlamaydi.")
+
+        if user.role in {UserRole.ADMIN, UserRole.OPERATOR}:
+            raise UserRoleChangeError("Admin yoki operator kompaniyani o'zi tanlay olmaydi.")
 
         user.company_id = company_id
         await self._session.commit()

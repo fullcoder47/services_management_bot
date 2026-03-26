@@ -5,6 +5,7 @@ import asyncio
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 from bot.handlers import register_routers
 from bot.middlewares import DbSessionMiddleware, SubscriptionMiddleware
@@ -30,6 +31,13 @@ async def main() -> None:
     dispatcher.message.middleware(SubscriptionMiddleware())
     dispatcher.callback_query.middleware(SubscriptionMiddleware())
     register_routers(dispatcher)
+
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="Botni qayta ochish"),
+            BotCommand(command="yordam", description="Admin bilan bog'lanish"),
+        ]
+    )
 
     try:
         await dispatcher.start_polling(bot)

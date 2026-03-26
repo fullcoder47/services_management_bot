@@ -29,12 +29,7 @@ from services.company_service import (
     CreateCompanyDTO,
     normalize_utc_datetime,
 )
-from services.users import (
-    TelegramUserDTO,
-    UserNotFoundError,
-    UserRoleChangeError,
-    UserService,
-)
+from services.user_service import TelegramUserDTO, UserService
 
 
 router = Router(name=__name__)
@@ -43,7 +38,6 @@ router = Router(name=__name__)
 class CompanyManagementStates(StatesGroup):
     waiting_for_name = State()
     waiting_for_plan = State()
-    waiting_for_user_telegram_id = State()
 
 
 @router.message(Command("companies"))
@@ -272,79 +266,10 @@ async def deactivate_company_subscription(
 
 
 @router.callback_query(CompanyActionCallback.filter(F.action == "bind_user"))
-async def start_bind_user_to_company(
-    callback: CallbackQuery,
-    callback_data: CompanyActionCallback,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
-    admin = await _authorize_super_admin_callback(callback, session)
-    if admin is None:
-        return
-
-    company_service = CompanyService(session)
-    company = await company_service.get_company(callback_data.company_id)
-    if company is None:
-        await callback.answer("Kompaniya topilmadi.", show_alert=True)
-        return
-
-    await state.clear()
-    await state.set_state(CompanyManagementStates.waiting_for_user_telegram_id)
-    await state.update_data(company_id=company.id)
-
-    if callback.message is not None:
-        details_text = await _build_company_details_text(session, company)
-        await _safe_edit_text(
-            callback.message,
-            details_text
-            + "\n\nBiriktirmoqchi bo'lgan foydalanuvchining Telegram ID raqamini yuboring.",
-            reply_markup=build_company_cancel_keyboard(),
-        )
-    await callback.answer()
-
-
-@router.message(CompanyManagementStates.waiting_for_user_telegram_id)
-async def bind_user_to_company(
-    message: Message,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
-    admin = await _authorize_super_admin_message(message, session)
-    if admin is None:
-        return
-
-    telegram_id_text = (message.text or "").strip()
-    if not telegram_id_text.isdigit():
-        await message.answer("Telegram ID faqat raqamlardan iborat bo'lishi kerak.")
-        return
-
-    data = await state.get_data()
-    company_id = int(data.get("company_id", 0))
-    if company_id <= 0:
-        await state.clear()
-        await message.answer("Kompaniya ma'lumoti topilmadi. Qaytadan urinib ko'ring.")
-        return
-
-    company_service = CompanyService(session)
-    company = await company_service.get_company(company_id)
-    if company is None:
-        await state.clear()
-        await message.answer("Kompaniya topilmadi.")
-        return
-
-    user_service = UserService(session)
-    try:
-        user = await user_service.assign_company(int(telegram_id_text), company.id)
-    except (UserNotFoundError, UserRoleChangeError) as exc:
-        await message.answer(str(exc))
-        return
-
-    await state.clear()
-    details_text = await _build_company_details_text(session, company)
-    await message.answer(
-        f"Foydalanuvchi <b>{escape(user.display_name)}</b> kompaniyaga biriktirildi.\n\n"
-        + details_text,
-        reply_markup=build_company_actions_keyboard(company.id),
+async def disabled_bind_user_callback(callback: CallbackQuery) -> None:
+    await callback.answer(
+        "Foydalanuvchi endi kompaniyani /start orqali o‘zi tanlaydi.",
+        show_alert=True,
     )
 
 
@@ -413,7 +338,7 @@ async def _authorize_super_admin_message(
         return None
 
     user = await _register_and_get_user(message.from_user, session)
-    if user is None or not user.is_super_admin:
+    if not user.is_super_admin:
         await message.answer("Kompaniyalarni faqat super admin boshqara oladi.")
         return None
     return user
@@ -428,7 +353,7 @@ async def _authorize_super_admin_callback(
         return None
 
     user = await _register_and_get_user(callback.from_user, session)
-    if user is None or not user.is_super_admin:
+    if not user.is_super_admin:
         await callback.answer("Kompaniyalarni faqat super admin boshqara oladi.", show_alert=True)
         return None
     return user
@@ -437,7 +362,7 @@ async def _authorize_super_admin_callback(
 async def _register_and_get_user(
     telegram_user: AiogramUser,
     session: AsyncSession,
-) -> User | None:
+) -> User:
     user_service = UserService(session)
     registration = await user_service.register_or_update(
         TelegramUserDTO.from_aiogram_user(telegram_user)
