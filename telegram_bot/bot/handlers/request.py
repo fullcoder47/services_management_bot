@@ -6,16 +6,14 @@ from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message, ReplyKeyboardRemove, User as AiogramUser
+from aiogram.types import CallbackQuery, Message, User as AiogramUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.keyboards.main_menu import build_main_menu
 from bot.keyboards.request_keyboard import (
-    REQUEST_CREATE_CANCEL_TEXT,
     RequestMenuCallback,
     build_request_create_cancel_keyboard,
     build_request_optional_image_keyboard,
-    build_request_phone_keyboard,
 )
 from bot.keyboards.user_keyboard import (
     UserRequestMenuCallback,
@@ -49,11 +47,15 @@ async def request_entry(
     if current_user is None:
         return
 
+    if not current_user.phone_number:
+        await message.answer("Avval /start yuborib telefon raqamingizni saqlang.")
+        return
+
     await state.clear()
-    await state.set_state(RequestCreateStates.waiting_for_phone)
+    await state.set_state(RequestCreateStates.waiting_for_problem)
     await message.answer(
-        "Telefon raqamingizni yuboring yoki pastdagi tugma orqali ulashing.",
-        reply_markup=build_request_phone_keyboard(),
+        "Muammo tavsifini yozing.",
+        reply_markup=build_request_create_cancel_keyboard(),
     )
 
 
@@ -73,7 +75,14 @@ async def my_requests_entry(
     await message.answer(text, reply_markup=keyboard)
 
 
-@router.callback_query(RequestMenuCallback.filter(F.action == "cancel_create"))
+@router.callback_query(
+    RequestMenuCallback.filter(F.action == "cancel_create"),
+    RequestCreateStates.waiting_for_problem,
+)
+@router.callback_query(
+    RequestMenuCallback.filter(F.action == "cancel_create"),
+    RequestCreateStates.waiting_for_image,
+)
 async def request_create_cancel(
     callback: CallbackQuery,
     state: FSMContext,
@@ -88,7 +97,7 @@ async def request_create_cancel(
         await _safe_edit_text(callback.message, "Ariza yaratish bekor qilindi.")
         await callback.message.answer(
             "Asosiy menyu",
-            reply_markup=build_main_menu(current_user),
+            reply_markup=_build_user_menu(current_user),
         )
     await callback.answer()
 
@@ -127,7 +136,7 @@ async def request_create_skip_image(
         )
         await callback.message.answer(
             "Asosiy menyu",
-            reply_markup=build_main_menu(current_user),
+            reply_markup=_build_user_menu(current_user),
         )
     await callback.answer("Ariza rasmsiz yuborildi.")
     await _notify_management_users(callback.bot, session, request)
@@ -174,44 +183,6 @@ async def user_request_detail_callback(
     await callback.answer()
 
 
-@router.message(RequestCreateStates.waiting_for_phone)
-async def capture_request_phone(
-    message: Message,
-    state: FSMContext,
-    session: AsyncSession,
-) -> None:
-    current_user = await _authorize_request_user_message(message, session)
-    if current_user is None:
-        return
-
-    if (message.text or "").strip() == REQUEST_CREATE_CANCEL_TEXT:
-        await state.clear()
-        await message.answer(
-            "Ariza yaratish bekor qilindi.",
-            reply_markup=build_main_menu(current_user),
-        )
-        return
-
-    phone = _extract_phone(message)
-    if not phone:
-        await message.answer(
-            "Telefon raqami majburiy. Uni yozib yuboring yoki pastdagi tugma bilan ulashing.",
-            reply_markup=build_request_phone_keyboard(),
-        )
-        return
-
-    await state.update_data(phone=phone)
-    await state.set_state(RequestCreateStates.waiting_for_problem)
-    await message.answer(
-        "Telefon raqamingiz qabul qilindi.",
-        reply_markup=ReplyKeyboardRemove(),
-    )
-    await message.answer(
-        "Muammo tavsifini yozing.",
-        reply_markup=build_request_create_cancel_keyboard(),
-    )
-
-
 @router.message(RequestCreateStates.waiting_for_problem)
 async def capture_request_problem(
     message: Message,
@@ -220,6 +191,11 @@ async def capture_request_problem(
 ) -> None:
     current_user = await _authorize_request_user_message(message, session)
     if current_user is None:
+        return
+
+    if not current_user.phone_number:
+        await state.clear()
+        await message.answer("Avval /start yuborib telefon raqamingizni saqlang.")
         return
 
     problem_text = (message.text or "").strip()
@@ -265,7 +241,7 @@ async def capture_request_image(
         "✅ Arizangiz yuborildi.\n"
         f"Ariza ID: <b>#{request.id}</b>\n"
         "Rasm ham biriktirildi va ariza ko'rib chiqishga yuborildi.",
-        reply_markup=build_main_menu(current_user),
+        reply_markup=_build_user_menu(current_user),
     )
     await _notify_management_users(message.bot, session, request)
 
@@ -278,6 +254,11 @@ async def capture_request_image_invalid(
 ) -> None:
     current_user = await _authorize_request_user_message(message, session)
     if current_user is None:
+        return
+
+    if not current_user.phone_number:
+        await state.clear()
+        await message.answer("Avval /start yuborib telefon raqamingizni saqlang.")
         return
 
     await message.answer(
@@ -294,9 +275,10 @@ async def _create_request_from_state(
 ) -> Request:
     if current_user.company_id is None:
         raise RequestValidationError("Avval /start orqali kompaniyangizni tanlang.")
+    if not current_user.phone_number:
+        raise RequestValidationError("Telefon raqami topilmadi. Avval /start yuboring.")
 
     data = await state.get_data()
-    phone = str(data.get("phone", "")).strip()
     problem_text = str(data.get("problem_text", "")).strip()
 
     request_service = RequestService(session)
@@ -304,7 +286,7 @@ async def _create_request_from_state(
         CreateRequestDTO(
             user_id=current_user.id,
             company_id=current_user.company_id,
-            phone=phone,
+            phone=current_user.phone_number,
             problem_text=problem_text,
             problem_image=problem_image,
         )
@@ -350,16 +332,18 @@ async def _notify_management_users(
 
     for recipient in recipients:
         try:
-            await bot.send_message(
-                chat_id=recipient.telegram_id,
-                text=text,
-                reply_markup=build_request_admin_actions_keyboard(request),
-            )
             if request.problem_image:
                 await bot.send_photo(
                     chat_id=recipient.telegram_id,
                     photo=request.problem_image,
-                    caption=f"📷 Ariza #{request.id} uchun biriktirilgan rasm",
+                    caption=text,
+                    reply_markup=build_request_admin_actions_keyboard(request),
+                )
+            else:
+                await bot.send_message(
+                    chat_id=recipient.telegram_id,
+                    text=text,
+                    reply_markup=build_request_admin_actions_keyboard(request),
                 )
         except Exception:
             continue
@@ -394,14 +378,6 @@ def _format_user_request_detail(request: Request) -> str:
         if request.completed_at is not None:
             lines.append(f"🕒 Yakunlangan: <b>{request.completed_at.strftime('%Y-%m-%d %H:%M UTC')}</b>")
     return "\n".join(lines)
-
-
-def _extract_phone(message: Message) -> str:
-    if message.contact is not None and message.contact.phone_number:
-        return message.contact.phone_number.strip()
-    if message.text is not None:
-        return message.text.strip()
-    return ""
 
 
 async def _authorize_request_user_message(
@@ -449,6 +425,10 @@ async def _register_and_get_user(
         TelegramUserDTO.from_aiogram_user(telegram_user)
     )
     return registration.user
+
+
+def _build_user_menu(user: User):
+    return build_main_menu(role=user.role, has_company=user.company_id is not None)
 
 
 async def _safe_edit_text(message: Message, text: str, reply_markup=None) -> None:

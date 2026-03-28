@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import InlineKeyboardMarkup
-from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
 from db.models import Company, Request
 from services.request_service import RequestService
@@ -29,6 +29,22 @@ def build_company_choice_keyboard(companies: list[Company]) -> InlineKeyboardMar
         )
     builder.adjust(1)
     return builder.as_markup()
+
+
+def build_user_phone_keyboard() -> ReplyKeyboardMarkup:
+    builder = ReplyKeyboardBuilder()
+    builder.add(
+        KeyboardButton(
+            text="📱 Telefonni yuborish",
+            request_contact=True,
+        )
+    )
+    builder.adjust(1)
+    return builder.as_markup(
+        resize_keyboard=True,
+        one_time_keyboard=True,
+        input_field_placeholder="Telefon raqamingizni yuboring",
+    )
 
 
 def build_user_request_list_keyboard(requests: list[Request]) -> InlineKeyboardMarkup:

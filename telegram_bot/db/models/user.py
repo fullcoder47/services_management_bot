@@ -23,6 +23,7 @@ class User(Base, TimestampMixin):
     username: Mapped[str | None] = mapped_column(String(255), nullable=True)
     first_name: Mapped[str] = mapped_column(String(255), nullable=False)
     last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
     language_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

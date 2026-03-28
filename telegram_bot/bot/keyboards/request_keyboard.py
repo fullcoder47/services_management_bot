@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
-from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
+from aiogram.types import InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from db.models import Request, RequestStatus
-
-
-REQUEST_CREATE_CANCEL_TEXT = "❌ Bekor qilish"
 
 
 class RequestMenuCallback(CallbackData, prefix="request_menu"):
@@ -26,23 +23,6 @@ class RequestActionCallback(CallbackData, prefix="request_action"):
 class RequestDoneConfirmCallback(CallbackData, prefix="request_done_confirm"):
     action: str
     request_id: int
-
-
-def build_request_phone_keyboard() -> ReplyKeyboardMarkup:
-    builder = ReplyKeyboardBuilder()
-    builder.add(
-        KeyboardButton(
-            text="📱 Telefonni yuborish",
-            request_contact=True,
-        )
-    )
-    builder.add(KeyboardButton(text=REQUEST_CREATE_CANCEL_TEXT))
-    builder.adjust(1)
-    return builder.as_markup(
-        resize_keyboard=True,
-        one_time_keyboard=True,
-        input_field_placeholder="Telefon raqamingizni yuboring",
-    )
 
 
 def build_request_create_cancel_keyboard() -> InlineKeyboardMarkup:

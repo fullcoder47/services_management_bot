@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+import re
 
 from aiogram.types import User as AiogramUser
 from sqlalchemy import func, select
@@ -24,6 +25,10 @@ class UserRoleChangeError(UserServiceError):
 
 
 class UserAccessError(UserServiceError):
+    pass
+
+
+class UserValidationError(UserServiceError):
     pass
 
 
@@ -226,6 +231,17 @@ class UserService:
         await self._session.refresh(user)
         return user
 
+    async def update_phone_number(self, telegram_id: int, phone_number: str) -> User:
+        user = await self._get_by_telegram_id(telegram_id)
+        if user is None:
+            raise UserNotFoundError("Foydalanuvchi topilmadi. Avval /start yuboring.")
+
+        normalized_phone = self.normalize_phone_number(phone_number)
+        user.phone_number = normalized_phone
+        await self._session.commit()
+        await self._session.refresh(user)
+        return user
+
     async def assign_company(self, telegram_id: int, company_id: int | None) -> User:
         user = await self._get_by_telegram_id(telegram_id)
         if user is None:
@@ -265,6 +281,22 @@ class UserService:
         result = await self._session.execute(statement)
         total_super_admins = result.scalar_one()
         return UserRole.SUPER_ADMIN if total_super_admins == 0 else UserRole.USER
+
+    @staticmethod
+    def normalize_phone_number(phone_number: str) -> str:
+        raw_value = phone_number.strip()
+        if not raw_value:
+            raise UserValidationError("Telefon raqami majburiy.")
+
+        normalized = re.sub(r"[^\d+]", "", raw_value)
+        if normalized.count("+") > 1 or ("+" in normalized and not normalized.startswith("+")):
+            raise UserValidationError("Telefon raqami noto'g'ri formatda.")
+
+        digits_only = normalized[1:] if normalized.startswith("+") else normalized
+        if not digits_only.isdigit() or len(digits_only) < 7 or len(digits_only) > 15:
+            raise UserValidationError("Telefon raqami noto'g'ri formatda.")
+
+        return f"+{digits_only}" if normalized.startswith("+") else digits_only
 
     @staticmethod
     def _sync_user(db_user: User, telegram_user: TelegramUserDTO) -> None:

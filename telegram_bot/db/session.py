@@ -32,6 +32,8 @@ class Database:
             user_columns = {column["name"] for column in inspector.get_columns("users")}
             if "company_id" not in user_columns:
                 connection.execute(text("ALTER TABLE users ADD COLUMN company_id INTEGER"))
+            if "phone_number" not in user_columns:
+                connection.execute(text("ALTER TABLE users ADD COLUMN phone_number VARCHAR(32)"))
 
             connection.execute(
                 text("CREATE INDEX IF NOT EXISTS ix_users_company_id ON users (company_id)")
