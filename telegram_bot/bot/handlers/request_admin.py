@@ -115,13 +115,13 @@ async def request_details_callback(
         await callback.answer(str(exc), show_alert=True)
         return
 
+    await callback.answer()
     if callback.message is not None:
         await _show_request_message(
             callback.message,
             await _format_request_detail(request, current_user.ui_language),
             reply_markup=build_request_admin_actions_keyboard(request, current_user.ui_language),
         )
-    await callback.answer()
 
 
 @router.callback_query(RequestActionCallback.filter(F.action == "accept"))
@@ -141,6 +141,7 @@ async def request_accept_callback(
         await callback.answer(str(exc), show_alert=True)
         return
 
+    await callback.answer(t(current_user.ui_language, "request_accept_alert"))
     if callback.message is not None:
         await _show_request_message(
             callback.message,
@@ -153,7 +154,6 @@ async def request_accept_callback(
         request,
         request.user.ui_language if request.user is not None else current_user.ui_language,
     )
-    await callback.answer(t(current_user.ui_language, "request_accept_alert"))
 
 
 @router.callback_query(RequestActionCallback.filter(F.action == "done"))

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-from aiohttp import ClientError, ClientSession
+from aiohttp import ClientError, ClientSession, ClientTimeout
 
 from db.models import UserLanguage
 
 
 class TranslationService:
     GOOGLE_TRANSLATE_URL = "https://translate.googleapis.com/translate_a/single"
+    REQUEST_TIMEOUT = ClientTimeout(total=1.5)
 
     async def translate_text(
         self,
@@ -26,7 +27,7 @@ class TranslationService:
 
         try:
             async with ClientSession() as session:
-                async with session.get(query, timeout=10) as response:
+                async with session.get(query, timeout=self.REQUEST_TIMEOUT) as response:
                     if response.status != 200:
                         return text
                     payload = await response.json(content_type=None)

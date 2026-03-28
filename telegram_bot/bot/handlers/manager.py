@@ -83,7 +83,8 @@ async def broadcast_choose_target(
     await state.update_data(target=target)
 
     if callback.message is not None:
-        await callback.message.edit_text(
+        await _safe_edit_text(
+            callback.message,
             t(actor.ui_language, "broadcast_prompt"),
             reply_markup=build_broadcast_cancel_keyboard(actor.ui_language),
         )
@@ -102,7 +103,7 @@ async def broadcast_cancel(
 
     await state.clear()
     if callback.message is not None:
-        await callback.message.edit_text(t(actor.ui_language, "broadcast_cancelled"))
+        await _safe_edit_text(callback.message, t(actor.ui_language, "broadcast_cancelled"))
     await callback.answer()
 
 
@@ -151,6 +152,17 @@ async def broadcast_send(
                     video=payload["file_id"],
                     caption=payload["caption"] or None,
                 )
+            elif content_type == "voice":
+                await message.bot.send_voice(
+                    chat_id=recipient.telegram_id,
+                    voice=payload["file_id"],
+                    caption=payload["caption"] or None,
+                )
+            elif content_type == "video_note":
+                await message.bot.send_video_note(
+                    chat_id=recipient.telegram_id,
+                    video_note=payload["file_id"],
+                )
             sent_count += 1
         except Exception:
             failed_count += 1
@@ -165,10 +177,22 @@ def _extract_broadcast_payload(message: Message):
     if message.text:
         return "text", message.html_text or escape(message.text)
     if message.photo:
-        return "photo", {"file_id": message.photo[-1].file_id, "caption": message.html_caption or ""}
+        return "photo", {"file_id": message.photo[-1].file_id, "caption": _extract_caption(message)}
     if message.video:
-        return "video", {"file_id": message.video.file_id, "caption": message.html_caption or ""}
+        return "video", {"file_id": message.video.file_id, "caption": _extract_caption(message)}
+    if message.voice:
+        return "voice", {"file_id": message.voice.file_id, "caption": _extract_caption(message)}
+    if message.video_note:
+        return "video_note", {"file_id": message.video_note.file_id}
     return "", None
+
+
+def _extract_caption(message: Message) -> str:
+    if message.html_caption:
+        return message.html_caption
+    if message.caption:
+        return escape(message.caption)
+    return ""
 
 
 async def _build_users_text(session: AsyncSession, actor: User) -> str:
@@ -258,3 +282,10 @@ def _format_role(role: UserRole, language) -> str:
     if role == UserRole.OPERATOR:
         return t(language, "role_operator")
     return t(language, "role_user")
+
+
+async def _safe_edit_text(message: Message, text: str, reply_markup=None) -> None:
+    try:
+        await message.edit_text(text, reply_markup=reply_markup)
+    except Exception:
+        await message.answer(text, reply_markup=reply_markup)
