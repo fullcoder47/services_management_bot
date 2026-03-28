@@ -139,29 +139,56 @@ async def broadcast_send(
     for recipient in recipients:
         try:
             if content_type == "text":
-                await message.bot.send_message(chat_id=recipient.telegram_id, text=payload)
+                await message.bot.send_message(
+                    chat_id=recipient.telegram_id,
+                    text=payload["text"],
+                    entities=payload["entities"],
+                    parse_mode=None,
+                )
             elif content_type == "photo":
                 await message.bot.send_photo(
                     chat_id=recipient.telegram_id,
                     photo=payload["file_id"],
-                    caption=payload["caption"] or None,
+                    caption=payload["caption"],
+                    caption_entities=payload["caption_entities"],
+                    parse_mode=None,
                 )
             elif content_type == "video":
                 await message.bot.send_video(
                     chat_id=recipient.telegram_id,
                     video=payload["file_id"],
-                    caption=payload["caption"] or None,
+                    caption=payload["caption"],
+                    caption_entities=payload["caption_entities"],
+                    parse_mode=None,
                 )
             elif content_type == "voice":
                 await message.bot.send_voice(
                     chat_id=recipient.telegram_id,
                     voice=payload["file_id"],
-                    caption=payload["caption"] or None,
+                    caption=payload["caption"],
+                    caption_entities=payload["caption_entities"],
+                    parse_mode=None,
                 )
             elif content_type == "video_note":
                 await message.bot.send_video_note(
                     chat_id=recipient.telegram_id,
                     video_note=payload["file_id"],
+                )
+            elif content_type == "audio":
+                await message.bot.send_audio(
+                    chat_id=recipient.telegram_id,
+                    audio=payload["file_id"],
+                    caption=payload["caption"],
+                    caption_entities=payload["caption_entities"],
+                    parse_mode=None,
+                )
+            elif content_type == "document":
+                await message.bot.send_document(
+                    chat_id=recipient.telegram_id,
+                    document=payload["file_id"],
+                    caption=payload["caption"],
+                    caption_entities=payload["caption_entities"],
+                    parse_mode=None,
                 )
             sent_count += 1
         except Exception:
@@ -175,24 +202,28 @@ async def broadcast_send(
 
 def _extract_broadcast_payload(message: Message):
     if message.text:
-        return "text", message.html_text or escape(message.text)
+        return "text", {"text": message.text, "entities": message.entities}
     if message.photo:
-        return "photo", {"file_id": message.photo[-1].file_id, "caption": _extract_caption(message)}
+        return "photo", _extract_media_payload(message.photo[-1].file_id, message)
     if message.video:
-        return "video", {"file_id": message.video.file_id, "caption": _extract_caption(message)}
+        return "video", _extract_media_payload(message.video.file_id, message)
     if message.voice:
-        return "voice", {"file_id": message.voice.file_id, "caption": _extract_caption(message)}
+        return "voice", _extract_media_payload(message.voice.file_id, message)
     if message.video_note:
         return "video_note", {"file_id": message.video_note.file_id}
+    if message.audio:
+        return "audio", _extract_media_payload(message.audio.file_id, message)
+    if message.document:
+        return "document", _extract_media_payload(message.document.file_id, message)
     return "", None
 
 
-def _extract_caption(message: Message) -> str:
-    if message.html_caption:
-        return message.html_caption
-    if message.caption:
-        return escape(message.caption)
-    return ""
+def _extract_media_payload(file_id: str, message: Message) -> dict[str, object]:
+    return {
+        "file_id": file_id,
+        "caption": message.caption or None,
+        "caption_entities": message.caption_entities,
+    }
 
 
 async def _build_users_text(session: AsyncSession, actor: User) -> str:
