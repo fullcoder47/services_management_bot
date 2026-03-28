@@ -34,6 +34,8 @@ class Database:
                 connection.execute(text("ALTER TABLE users ADD COLUMN company_id INTEGER"))
             if "phone_number" not in user_columns:
                 connection.execute(text("ALTER TABLE users ADD COLUMN phone_number VARCHAR(32)"))
+            if "preferred_language" not in user_columns:
+                connection.execute(text("ALTER TABLE users ADD COLUMN preferred_language VARCHAR(8)"))
 
             connection.execute(
                 text("CREATE INDEX IF NOT EXISTS ix_users_company_id ON users (company_id)")
@@ -63,6 +65,8 @@ class Database:
                 connection.execute(text("ALTER TABLE requests ADD COLUMN company_id INTEGER"))
             if "problem_image" not in request_columns:
                 connection.execute(text("ALTER TABLE requests ADD COLUMN problem_image VARCHAR(512)"))
+            if "address" not in request_columns:
+                connection.execute(text("ALTER TABLE requests ADD COLUMN address TEXT"))
 
             connection.execute(
                 text("CREATE INDEX IF NOT EXISTS ix_requests_user_id ON requests (user_id)")

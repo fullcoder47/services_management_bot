@@ -23,6 +23,7 @@ from bot.keyboards.user_keyboard import (
 )
 from bot.states import RequestCreateStates
 from db.models import Request, RequestStatus, User, UserRole
+from services.i18n import button_variants, t
 from services.request_service import (
     CreateRequestDTO,
     RequestAccessDeniedError,
@@ -30,6 +31,7 @@ from services.request_service import (
     RequestService,
     RequestValidationError,
 )
+from services.translation_service import TranslationService
 from services.user_service import TelegramUserDTO, UserService
 
 
@@ -37,7 +39,7 @@ router = Router(name=__name__)
 
 
 @router.message(Command("request"))
-@router.message(F.text == "📨 Ariza qoldirish")
+@router.message(F.text.in_(button_variants("menu_leave_request")))
 async def request_entry(
     message: Message,
     state: FSMContext,
@@ -47,20 +49,21 @@ async def request_entry(
     if current_user is None:
         return
 
+    language = current_user.ui_language
     if not current_user.phone_number:
-        await message.answer("Avval /start yuborib telefon raqamingizni saqlang.")
+        await message.answer(t(language, "start_need_phone_first"))
         return
 
     await state.clear()
     await state.set_state(RequestCreateStates.waiting_for_problem)
     await message.answer(
-        "Muammo tavsifini yozing.",
-        reply_markup=build_request_create_cancel_keyboard(),
+        t(language, "request_problem_prompt"),
+        reply_markup=build_request_create_cancel_keyboard(language),
     )
 
 
 @router.message(Command("my_requests"))
-@router.message(F.text == "📄 Mening arizalarim")
+@router.message(F.text.in_(button_variants("menu_my_requests")))
 async def my_requests_entry(
     message: Message,
     state: FSMContext,
@@ -81,6 +84,10 @@ async def my_requests_entry(
 )
 @router.callback_query(
     RequestMenuCallback.filter(F.action == "cancel_create"),
+    RequestCreateStates.waiting_for_address,
+)
+@router.callback_query(
+    RequestMenuCallback.filter(F.action == "cancel_create"),
     RequestCreateStates.waiting_for_image,
 )
 async def request_create_cancel(
@@ -92,11 +99,12 @@ async def request_create_cancel(
     if current_user is None:
         return
 
+    language = current_user.ui_language
     await state.clear()
     if callback.message is not None:
-        await _safe_edit_text(callback.message, "Ariza yaratish bekor qilindi.")
+        await _safe_edit_text(callback.message, t(language, "request_cancelled"))
         await callback.message.answer(
-            "Asosiy menyu",
+            t(language, "request_menu_title"),
             reply_markup=_build_user_menu(current_user),
         )
     await callback.answer()
@@ -115,6 +123,7 @@ async def request_create_skip_image(
     if current_user is None:
         return
 
+    language = current_user.ui_language
     try:
         request = await _create_request_from_state(
             state=state,
@@ -130,15 +139,13 @@ async def request_create_skip_image(
     if callback.message is not None:
         await _safe_edit_text(
             callback.message,
-            "✅ Arizangiz yuborildi.\n"
-            f"Ariza ID: <b>#{request.id}</b>\n"
-            "Tez orada ko'rib chiqiladi.",
+            t(language, "request_created", request_id=request.id),
         )
         await callback.message.answer(
-            "Asosiy menyu",
+            t(language, "request_menu_title"),
             reply_markup=_build_user_menu(current_user),
         )
-    await callback.answer("Ariza rasmsiz yuborildi.")
+    await callback.answer()
     await _notify_management_users(callback.bot, session, request)
 
 
@@ -177,8 +184,8 @@ async def user_request_detail_callback(
     if callback.message is not None:
         await _safe_edit_text(
             callback.message,
-            _format_user_request_detail(request),
-            reply_markup=build_user_request_back_keyboard(),
+            _format_user_request_detail(request, current_user.ui_language),
+            reply_markup=build_user_request_back_keyboard(current_user.ui_language),
         )
     await callback.answer()
 
@@ -193,24 +200,47 @@ async def capture_request_problem(
     if current_user is None:
         return
 
-    if not current_user.phone_number:
-        await state.clear()
-        await message.answer("Avval /start yuborib telefon raqamingizni saqlang.")
-        return
-
+    language = current_user.ui_language
     problem_text = (message.text or "").strip()
     if not problem_text:
         await message.answer(
-            "Muammo tavsifi majburiy. Qaytadan yuboring.",
-            reply_markup=build_request_create_cancel_keyboard(),
+            t(language, "request_problem_required"),
+            reply_markup=build_request_create_cancel_keyboard(language),
         )
         return
 
     await state.update_data(problem_text=problem_text)
+    await state.set_state(RequestCreateStates.waiting_for_address)
+    await message.answer(
+        t(language, "request_address_prompt"),
+        reply_markup=build_request_create_cancel_keyboard(language),
+    )
+
+
+@router.message(RequestCreateStates.waiting_for_address)
+async def capture_request_address(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    current_user = await _authorize_request_user_message(message, session)
+    if current_user is None:
+        return
+
+    language = current_user.ui_language
+    address = (message.text or "").strip()
+    if not address:
+        await message.answer(
+            t(language, "request_address_required"),
+            reply_markup=build_request_create_cancel_keyboard(language),
+        )
+        return
+
+    await state.update_data(address=address)
     await state.set_state(RequestCreateStates.waiting_for_image)
     await message.answer(
-        "Agar xohlasangiz, muammo rasmini yuboring.\nPastdagi tugma orqali bu bosqichni o'tkazib yuborishingiz mumkin.",
-        reply_markup=build_request_optional_image_keyboard(),
+        t(language, "request_image_prompt"),
+        reply_markup=build_request_optional_image_keyboard(language),
     )
 
 
@@ -224,6 +254,7 @@ async def capture_request_image(
     if current_user is None:
         return
 
+    language = current_user.ui_language
     photo = message.photo[-1]
     try:
         request = await _create_request_from_state(
@@ -233,14 +264,12 @@ async def capture_request_image(
             problem_image=photo.file_id,
         )
     except RequestValidationError as exc:
-        await message.answer(str(exc), reply_markup=build_request_optional_image_keyboard())
+        await message.answer(str(exc), reply_markup=build_request_optional_image_keyboard(language))
         return
 
     await state.clear()
     await message.answer(
-        "✅ Arizangiz yuborildi.\n"
-        f"Ariza ID: <b>#{request.id}</b>\n"
-        "Rasm ham biriktirildi va ariza ko'rib chiqishga yuborildi.",
+        t(language, "request_created_with_image", request_id=request.id),
         reply_markup=_build_user_menu(current_user),
     )
     await _notify_management_users(message.bot, session, request)
@@ -249,21 +278,15 @@ async def capture_request_image(
 @router.message(RequestCreateStates.waiting_for_image)
 async def capture_request_image_invalid(
     message: Message,
-    state: FSMContext,
     session: AsyncSession,
 ) -> None:
     current_user = await _authorize_request_user_message(message, session)
     if current_user is None:
         return
 
-    if not current_user.phone_number:
-        await state.clear()
-        await message.answer("Avval /start yuborib telefon raqamingizni saqlang.")
-        return
-
     await message.answer(
-        "Rasm yuboring yoki pastdagi `O‘tkazib yuborish` tugmasini bosing.",
-        reply_markup=build_request_optional_image_keyboard(),
+        t(current_user.ui_language, "request_image_invalid"),
+        reply_markup=build_request_optional_image_keyboard(current_user.ui_language),
     )
 
 
@@ -274,12 +297,13 @@ async def _create_request_from_state(
     problem_image: str | None,
 ) -> Request:
     if current_user.company_id is None:
-        raise RequestValidationError("Avval /start orqali kompaniyangizni tanlang.")
+        raise RequestValidationError(t(current_user.ui_language, "start_choose_company"))
     if not current_user.phone_number:
-        raise RequestValidationError("Telefon raqami topilmadi. Avval /start yuboring.")
+        raise RequestValidationError(t(current_user.ui_language, "start_need_phone_first"))
 
     data = await state.get_data()
     problem_text = str(data.get("problem_text", "")).strip()
+    address = str(data.get("address", "")).strip()
 
     request_service = RequestService(session)
     return await request_service.create_request(
@@ -288,6 +312,7 @@ async def _create_request_from_state(
             company_id=current_user.company_id,
             phone=current_user.phone_number,
             problem_text=problem_text,
+            address=address,
             problem_image=problem_image,
         )
     )
@@ -299,18 +324,19 @@ async def _build_user_requests_view(
 ) -> tuple[str, object | None]:
     request_service = RequestService(session)
     requests = await request_service.list_user_requests(user.id)
+    language = user.ui_language
 
-    lines = ["📄 Mening arizalarim", ""]
+    lines = [t(language, "request_list_title"), ""]
     if not requests:
-        lines.append("Sizda hozircha arizalar yo'q.")
+        lines.append(t(language, "request_list_empty"))
         return "\n".join(lines), None
 
-    lines.append("Arizalaringiz:")
+    lines.append(t(language, "request_list_items"))
     lines.append("")
     for request in requests:
-        lines.append(f"#{request.id} | {RequestService.format_status(request.status)}")
+        lines.append(f"#{request.id} | {RequestService.format_status(request.status, language)}")
 
-    return "\n".join(lines), build_user_request_list_keyboard(requests)
+    return "\n".join(lines), build_user_request_list_keyboard(requests, language)
 
 
 async def _notify_management_users(
@@ -327,56 +353,65 @@ async def _notify_management_users(
         return
 
     request = await request_service.get_request_or_raise(request.id)
-    text = _format_admin_new_request_text(request)
+    translator = TranslationService()
+
     from bot.keyboards.request_keyboard import build_request_admin_actions_keyboard
 
     for recipient in recipients:
         try:
+            text = await _format_admin_new_request_text(request, recipient.ui_language, translator)
             if request.problem_image:
                 await bot.send_photo(
                     chat_id=recipient.telegram_id,
                     photo=request.problem_image,
                     caption=text,
-                    reply_markup=build_request_admin_actions_keyboard(request),
+                    reply_markup=build_request_admin_actions_keyboard(request, recipient.ui_language),
                 )
             else:
                 await bot.send_message(
                     chat_id=recipient.telegram_id,
                     text=text,
-                    reply_markup=build_request_admin_actions_keyboard(request),
+                    reply_markup=build_request_admin_actions_keyboard(request, recipient.ui_language),
                 )
         except Exception:
             continue
 
 
-def _format_admin_new_request_text(request: Request) -> str:
-    user_name = request.user.display_name if request.user is not None else "Noma'lum"
-    company_name = request.company.name if request.company is not None else "Noma'lum kompaniya"
-    lines = [
-        "🆕 Yangi ariza:",
-        f"🏢 Kompaniya: <b>{escape(company_name)}</b>",
-        f"👤 User: <b>{escape(user_name)}</b>",
-        f"📞 Telefon: <b>{escape(request.phone)}</b>",
-        f"📝 Muammo: <b>{escape(request.problem_text)}</b>",
-    ]
-    if request.problem_image:
-        lines.append("📷 Rasm: <b>biriktirilgan</b>")
-    return "\n".join(lines)
+async def _format_admin_new_request_text(
+    request: Request,
+    language,
+    translator: TranslationService,
+) -> str:
+    user_name = request.user.display_name if request.user is not None else "Unknown"
+    company_name = request.company.name if request.company is not None else "Unknown company"
+    translated_problem = await translator.translate_text(request.problem_text, language)
+    translated_address = await translator.translate_text(request.address, language)
+    return (
+        f"{t(language, 'request_new_title')}\n"
+        f"{t(language, 'request_new_company')}: <b>{escape(company_name)}</b>\n"
+        f"{t(language, 'request_new_user')}: <b>{escape(user_name)}</b>\n"
+        f"{t(language, 'request_new_phone')}: <b>{escape(request.phone)}</b>\n"
+        f"{t(language, 'request_new_problem')}: <b>{escape(translated_problem)}</b>\n"
+        f"{t(language, 'request_new_address')}: <b>{escape(translated_address)}</b>"
+    )
 
 
-def _format_user_request_detail(request: Request) -> str:
+def _format_user_request_detail(request: Request, language) -> str:
     lines = [
-        f"<b>Ariza #{request.id}</b>",
-        f"Holati: <b>{RequestService.format_status(request.status)}</b>",
-        f"📞 Telefon: <b>{escape(request.phone)}</b>",
-        f"📝 Muammo: <b>{escape(request.problem_text)}</b>",
+        f"<b>{t(language, 'request_detail_title', request_id=request.id)}</b>",
+        f"{t(language, 'request_detail_status')}: <b>{RequestService.format_status(request.status, language)}</b>",
+        f"{t(language, 'request_detail_phone')}: <b>{escape(request.phone)}</b>",
+        f"{t(language, 'request_detail_problem')}: <b>{escape(request.problem_text)}</b>",
+        f"{t(language, 'request_detail_address')}: <b>{escape(request.address)}</b>",
     ]
     if request.problem_image:
-        lines.append("📷 Muammo rasmi: <b>biriktirilgan</b>")
+        lines.append(t(language, "request_detail_image"))
     if request.status == RequestStatus.DONE:
-        lines.append(f"✅ Yakuniy izoh: <b>{escape(request.result_text or '')}</b>")
+        lines.append(f"{t(language, 'request_detail_done_note')}: <b>{escape(request.result_text or '')}</b>")
         if request.completed_at is not None:
-            lines.append(f"🕒 Yakunlangan: <b>{request.completed_at.strftime('%Y-%m-%d %H:%M UTC')}</b>")
+            lines.append(
+                f"{t(language, 'request_detail_done_at')}: <b>{request.completed_at.strftime('%Y-%m-%d %H:%M UTC')}</b>"
+            )
     return "\n".join(lines)
 
 
@@ -390,10 +425,10 @@ async def _authorize_request_user_message(
 
     user = await _register_and_get_user(message.from_user, session)
     if user.role != UserRole.USER:
-        await message.answer("Bu bo'lim oddiy foydalanuvchilar uchun.")
+        await message.answer(t(user.ui_language, "request_user_only"))
         return None
     if user.company_id is None:
-        await message.answer("Avval /start orqali kompaniyangizni tanlang.")
+        await message.answer(t(user.ui_language, "start_choose_company"))
         return None
     return user
 
@@ -408,10 +443,10 @@ async def _authorize_request_user_callback(
 
     user = await _register_and_get_user(callback.from_user, session)
     if user.role != UserRole.USER:
-        await callback.answer("Bu bo'lim oddiy foydalanuvchilar uchun.", show_alert=True)
+        await callback.answer(t(user.ui_language, "request_user_only"), show_alert=True)
         return None
     if user.company_id is None:
-        await callback.answer("Avval /start orqali kompaniyangizni tanlang.", show_alert=True)
+        await callback.answer(t(user.ui_language, "start_choose_company"), show_alert=True)
         return None
     return user
 
@@ -428,7 +463,11 @@ async def _register_and_get_user(
 
 
 def _build_user_menu(user: User):
-    return build_main_menu(role=user.role, has_company=user.company_id is not None)
+    return build_main_menu(
+        role=user.role,
+        has_company=user.company_id is not None,
+        language=user.ui_language,
+    )
 
 
 async def _safe_edit_text(message: Message, text: str, reply_markup=None) -> None:

@@ -8,12 +8,12 @@ from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.company_service import CompanyService
+from services.i18n import button_variants, t
 from services.user_service import UserService
 
 
 class SubscriptionMiddleware(BaseMiddleware):
-    block_text = "❌ Bu kompaniya vaqtincha faol emas."
-    allowed_support_commands = {"/help", "/yordam", "yordam"}
+    allowed_support_commands = {"/help", "/yordam"}
 
     async def __call__(
         self,
@@ -51,16 +51,16 @@ class SubscriptionMiddleware(BaseMiddleware):
         if company_service.check_access(company):
             return await handler(event, data)
 
-        await self._notify_user(event)
+        await self._notify_user(event, t(user.ui_language, "inactive_company_block"))
         return None
 
-    async def _notify_user(self, event: TelegramObject) -> None:
+    async def _notify_user(self, event: TelegramObject, text: str) -> None:
         if isinstance(event, CallbackQuery):
-            await event.answer(self.block_text, show_alert=True)
+            await event.answer(text, show_alert=True)
             return
 
         if isinstance(event, Message):
-            await event.answer(self.block_text)
+            await event.answer(text)
 
     def _is_support_request(self, event: TelegramObject) -> bool:
         if not isinstance(event, Message):
@@ -72,4 +72,5 @@ class SubscriptionMiddleware(BaseMiddleware):
 
         command = text.split(maxsplit=1)[0]
         command = command.split("@", maxsplit=1)[0]
-        return command in self.allowed_support_commands
+        help_buttons = {variant.lower() for variant in button_variants("menu_help")}
+        return command in self.allowed_support_commands or text in help_buttons

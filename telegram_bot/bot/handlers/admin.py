@@ -22,6 +22,7 @@ from bot.keyboards.admin_keyboard import (
 from bot.states import AdminAssignStates
 from db.models import Company, User, UserRole
 from services.company_service import CompanyService
+from services.i18n import button_variants
 from services.user_service import TelegramUserDTO, UserRoleChangeError, UserService
 
 
@@ -30,6 +31,7 @@ router = Router(name=__name__)
 
 @router.message(Command("admins"))
 @router.message(F.text == "👤 Adminlar")
+@router.message(F.text.in_(button_variants("menu_admins")))
 async def admin_panel_entry(
     message: Message,
     state: FSMContext,

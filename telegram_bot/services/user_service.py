@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from db.models import Company, User, UserRole
+from db.models import Company, User, UserLanguage, UserRole
 
 
 class UserServiceError(Exception):
@@ -130,14 +130,21 @@ class UserService:
 
         raise UserAccessError("Bu bo'lim faqat super admin va admin uchun.")
 
-    async def get_broadcast_recipients(self, actor: User) -> list[User]:
+    async def get_broadcast_recipients(
+        self,
+        actor: User,
+        target: str = "all",
+    ) -> list[User]:
         if actor.is_super_admin:
-            statement = (
-                select(User)
-                .where(User.role != UserRole.SUPER_ADMIN)
-                .where(User.id != actor.id)
-                .order_by(User.company_id.asc(), User.id.asc())
-            )
+            statement = select(User).where(User.role != UserRole.SUPER_ADMIN).where(User.id != actor.id)
+            if target == "admins":
+                statement = statement.where(User.role.in_([UserRole.ADMIN, UserRole.OPERATOR]))
+            elif target == "users":
+                statement = statement.where(User.role == UserRole.USER)
+            elif target != "all":
+                raise UserAccessError("Xabar qabul qiluvchilari noto'g'ri tanlangan.")
+
+            statement = statement.order_by(User.company_id.asc(), User.id.asc())
             result = await self._session.execute(statement)
             return list(result.scalars().all())
 
@@ -238,6 +245,20 @@ class UserService:
 
         normalized_phone = self.normalize_phone_number(phone_number)
         user.phone_number = normalized_phone
+        await self._session.commit()
+        await self._session.refresh(user)
+        return user
+
+    async def update_preferred_language(
+        self,
+        telegram_id: int,
+        language: UserLanguage,
+    ) -> User:
+        user = await self._get_by_telegram_id(telegram_id)
+        if user is None:
+            raise UserNotFoundError("Foydalanuvchi topilmadi. Avval /start yuboring.")
+
+        user.preferred_language = language
         await self._session.commit()
         await self._session.refresh(user)
         return user

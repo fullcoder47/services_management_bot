@@ -15,6 +15,12 @@ class UserRole(StrEnum):
     SUPER_ADMIN = "super_admin"
 
 
+class UserLanguage(StrEnum):
+    UZ = "uz"
+    RU = "ru"
+    EN = "en"
+
+
 class User(Base, TimestampMixin):
     __tablename__ = "users"
 
@@ -24,6 +30,15 @@ class User(Base, TimestampMixin):
     first_name: Mapped[str] = mapped_column(String(255), nullable=False)
     last_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    preferred_language: Mapped[UserLanguage | None] = mapped_column(
+        Enum(
+            UserLanguage,
+            native_enum=False,
+            length=8,
+            values_callable=lambda enum_cls: [item.value for item in enum_cls],
+        ),
+        nullable=True,
+    )
     language_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
@@ -53,3 +68,7 @@ class User(Base, TimestampMixin):
     @property
     def display_name(self) -> str:
         return self.username or self.first_name
+
+    @property
+    def ui_language(self) -> UserLanguage:
+        return self.preferred_language or UserLanguage.UZ

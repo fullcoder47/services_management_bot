@@ -4,7 +4,8 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
-from db.models import Company, Request
+from db.models import Company, Request, UserLanguage
+from services.i18n import t
 from services.request_service import RequestService
 
 
@@ -20,6 +21,10 @@ class UserRequestSelectCallback(CallbackData, prefix="user_request_select"):
     request_id: int
 
 
+class UserLanguageCallback(CallbackData, prefix="user_language"):
+    language: str
+
+
 def build_company_choice_keyboard(companies: list[Company]) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for company in companies:
@@ -31,11 +36,22 @@ def build_company_choice_keyboard(companies: list[Company]) -> InlineKeyboardMar
     return builder.as_markup()
 
 
-def build_user_phone_keyboard() -> ReplyKeyboardMarkup:
+def build_language_select_keyboard() -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for language in UserLanguage:
+        builder.button(
+            text=t(language, "lang_name"),
+            callback_data=UserLanguageCallback(language=language.value),
+        )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_user_phone_keyboard(language: UserLanguage) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
     builder.add(
         KeyboardButton(
-            text="📱 Telefonni yuborish",
+            text=t(language, "share_phone_button"),
             request_contact=True,
         )
     )
@@ -43,25 +59,25 @@ def build_user_phone_keyboard() -> ReplyKeyboardMarkup:
     return builder.as_markup(
         resize_keyboard=True,
         one_time_keyboard=True,
-        input_field_placeholder="Telefon raqamingizni yuboring",
+        input_field_placeholder=t(language, "phone_placeholder"),
     )
 
 
-def build_user_request_list_keyboard(requests: list[Request]) -> InlineKeyboardMarkup:
+def build_user_request_list_keyboard(requests: list[Request], language: UserLanguage) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for request in requests:
         builder.button(
-            text=f"#{request.id} | {RequestService.format_status(request.status)}",
+            text=f"#{request.id} | {RequestService.format_status(request.status, language)}",
             callback_data=UserRequestSelectCallback(request_id=request.id),
         )
     builder.adjust(1)
     return builder.as_markup()
 
 
-def build_user_request_back_keyboard() -> InlineKeyboardMarkup:
+def build_user_request_back_keyboard(language: UserLanguage) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
-        text="⬅️ Orqaga",
+        text=t(language, "request_back"),
         callback_data=UserRequestMenuCallback(action="list"),
     )
     builder.adjust(1)

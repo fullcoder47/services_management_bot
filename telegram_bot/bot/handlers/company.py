@@ -29,6 +29,7 @@ from services.company_service import (
     CreateCompanyDTO,
     normalize_utc_datetime,
 )
+from services.i18n import button_variants
 from services.user_service import TelegramUserDTO, UserService
 
 
@@ -43,6 +44,7 @@ class CompanyManagementStates(StatesGroup):
 @router.message(Command("companies"))
 @router.message(Command("kompaniyalar"))
 @router.message(F.text == "Kompaniyalar")
+@router.message(F.text.in_(button_variants("menu_companies")))
 async def companies_command(
     message: Message,
     state: FSMContext,
