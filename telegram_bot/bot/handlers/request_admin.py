@@ -117,11 +117,7 @@ async def request_details_callback(
 
     await callback.answer()
     if callback.message is not None:
-        await _show_request_message(
-            callback.message,
-            await _format_request_detail(request, current_user.ui_language),
-            reply_markup=build_request_admin_actions_keyboard(request, current_user.ui_language),
-        )
+        await _show_request_detail_message(callback.message, request, current_user.ui_language)
 
 
 @router.callback_query(RequestActionCallback.filter(F.action == "accept"))
@@ -143,11 +139,7 @@ async def request_accept_callback(
 
     await callback.answer(t(current_user.ui_language, "request_accept_alert"))
     if callback.message is not None:
-        await _show_request_message(
-            callback.message,
-            await _format_request_detail(request, current_user.ui_language),
-            reply_markup=build_request_admin_actions_keyboard(request, current_user.ui_language),
-        )
+        await _show_request_detail_message(callback.message, request, current_user.ui_language)
 
     await _notify_user_status_update(
         callback.bot,
@@ -314,10 +306,7 @@ async def request_done_cancel(
     await state.clear()
     if callback.message is not None:
         await _safe_clear_reply_markup(callback.message)
-        await callback.message.answer(
-            await _format_request_detail(request, current_user.ui_language),
-            reply_markup=build_request_admin_actions_keyboard(request, current_user.ui_language),
-        )
+        await _show_request_detail_message(callback.message, request, current_user.ui_language)
     await callback.answer(t(current_user.ui_language, "request_done_cancelled"))
 
 
@@ -374,10 +363,7 @@ async def request_done_confirm(
 
     if callback.message is not None:
         await _safe_clear_reply_markup(callback.message)
-        await callback.message.answer(
-            await _format_request_detail(request, current_user.ui_language),
-            reply_markup=build_request_admin_actions_keyboard(request, current_user.ui_language),
-        )
+        await _show_request_detail_message(callback.message, request, current_user.ui_language)
     await callback.answer(t(current_user.ui_language, "request_done_alert"))
 
 
@@ -558,6 +544,41 @@ async def _show_request_message(message: Message, text: str, reply_markup=None) 
         return
 
     await _safe_edit_text(message, text, reply_markup=reply_markup)
+
+
+async def _show_request_detail_message(
+    message: Message,
+    request: Request,
+    language,
+) -> None:
+    detail_text = await _format_request_detail(request, language)
+    keyboard = build_request_admin_actions_keyboard(request, language)
+
+    if not request.problem_image:
+        await _show_request_message(message, detail_text, reply_markup=keyboard)
+        return
+
+    if message.photo:
+        try:
+            await message.edit_caption(caption=detail_text, reply_markup=keyboard)
+            return
+        except TelegramBadRequest as exc:
+            if "message is not modified" in str(exc):
+                return
+
+    await _safe_clear_reply_markup(message)
+    try:
+        await message.answer_photo(
+            request.problem_image,
+            caption=detail_text,
+            reply_markup=keyboard,
+        )
+    except TelegramBadRequest:
+        await message.answer_photo(
+            request.problem_image,
+            caption=t(language, "request_detail_image"),
+        )
+        await message.answer(detail_text, reply_markup=keyboard)
 
 
 def _build_export_filename(actor: User) -> str:
