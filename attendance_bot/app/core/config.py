@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -47,6 +48,22 @@ class Settings(BaseSettings):
 
     def is_super_admin(self, telegram_id: int) -> bool:
         return telegram_id in self.super_admin_telegram_ids
+
+    @property
+    def db_host(self) -> str | None:
+        normalized_url = self.db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        return urlsplit(normalized_url).hostname
+
+    @property
+    def masked_db_url(self) -> str:
+        normalized_url = self.db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
+        parsed = urlsplit(normalized_url)
+        netloc = parsed.hostname or ""
+        if parsed.port is not None:
+            netloc = f"{netloc}:{parsed.port}"
+        if parsed.username:
+            netloc = f"{parsed.username}:***@{netloc}"
+        return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
 
 
 @lru_cache(maxsize=1)
