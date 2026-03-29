@@ -1,0 +1,2 @@
+[console_scripts]
+attendance-bot = app.main:main
