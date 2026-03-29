@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
 from app.db.base import Base
+from app.db.models import User  # noqa: F401
 
 
 def create_engine_and_session_factory(

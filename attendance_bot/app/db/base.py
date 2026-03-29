@@ -32,6 +32,3 @@ class TimestampMixin:
         onupdate=func.now(),
         nullable=False,
     )
-
-
-from app.db.models.user import User  # noqa: E402,F401
