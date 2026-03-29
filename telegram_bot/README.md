@@ -1,50 +1,59 @@
-# Telegram Bot Shabloni
+# Telegram Attendance Bot - Phase 1
 
-Toza va kengaytirishga tayyor Telegram bot loyihasi:
+Bu bosqichda multi-company attendance bot uchun clean architecture asosidagi foundation tayyorlangan.
 
-- `aiogram 3`
-- `SQLAlchemy async`
-- `SQLite`
+## Implement qilingan qismlar
 
-## Imkoniyatlar
+- `app/` ichida clean architecture skeleti
+- Pydantic Settings asosidagi konfiguratsiya
+- PostgreSQL uchun async SQLAlchemy setup
+- Alembic'ga tayyor metadata va naming convention
+- `User` modeli va `Role` / `Language` enumlari
+- Localization helper va 3 til: `uz`, `ru`, `en`
+- `/start` oqimi, til tanlash va `SUPER_ADMIN` bootstrap logikasi
+- Super admin paneli uchun bazaviy reply keyboard va placeholder handlerlar
 
-- Toza va kengaytiriladigan loyiha tuzilmasi
-- `/start` buyrug'i
-- Foydalanuvchini avtomatik ro'yxatdan o'tkazish
-- Birinchi foydalanuvchi `super_admin` bo'ladi
-- SQLAlchemy orqali async ma'lumotlar bazasi ishlashi
+## Localization qanday ishlaydi
 
-## Loyiha Tuzilishi
+- Foydalanuvchiga ko'rinadigan matnlar `t(lang, uz=..., ru=..., en=...)` helper orqali olinadi.
+- Birinchi `/start` da userda til bo'lmasa, inline keyboard bilan til tanlanadi.
+- Tanlangan til `users.language` maydoniga saqlanadi.
+- Keyingi `/start` da til qayta so'ralmaydi.
 
-```text
-telegram_bot/
-|-- bot/
-|   |-- handlers/
-|   |-- keyboards/
-|   `-- middlewares/
-|-- core/
-|-- db/
-|   `-- models/
-|-- services/
-|-- .env.example
-|-- main.py
-`-- pyproject.toml
-```
+## O'rnatish
 
-## Ishga Tushirish
-
-1. Virtual muhit yarating va uni faollashtiring.
-2. Kerakli kutubxonalarni o'rnating:
+1. Virtual environment yarating va faollashtiring.
+2. Dependency o'rnating:
 
 ```bash
 pip install -e .
 ```
 
-3. `.env.example` faylidan `.env` nusxa yarating va bot tokenini kiriting.
-4. Botni ishga tushiring:
+3. `.env.example` dan `.env` yarating va qiymatlarni to'ldiring.
+4. PostgreSQL bazasini tayyorlang.
+
+## Ishga tushirish
 
 ```bash
-python main.py
+python -m app.main
 ```
 
-SQLite bazasi avtomatik ravishda `app.db` fayli sifatida yaratiladi.
+Yoki:
+
+```bash
+attendance-bot
+```
+
+## Environment variables
+
+```env
+BOT_TOKEN=your_bot_token_here
+DB_URL=postgresql+asyncpg://postgres:password@localhost:5432/attendance_bot
+SUPER_ADMIN_TELEGRAM_IDS=123456789,987654321
+```
+
+## Eslatma
+
+- Hozircha faqat foundation va super admin bootstrap implement qilingan.
+- `company CRUD`, `employees`, `attendance`, `shifts`, `reports`, `geolocation`, `video note` hali kiritilmagan.
+- Startup vaqtida `users` jadvali avtomatik yaratiladi.
