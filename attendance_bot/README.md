@@ -54,6 +54,8 @@ SUPER_ADMIN_TELEGRAM_IDS=123456789,987654321
 - Agar botni lokal kompyuterdan ishga tushirsangiz, `*.railway.internal` host ishlamaydi
 - Bunday hostlar Railway ichki tarmog'i uchun mo'ljallangan
 - Lokal ishga tushirish uchun Railway public PostgreSQL hosti yoki local PostgreSQL ishlating
+- Deploy uchun root `main.py`, `Procfile` va `railpack.json` qo'shilgan
+- Railway start command sifatida `python -m app.main` ishlatiladi
 
 ## Eslatma
 
