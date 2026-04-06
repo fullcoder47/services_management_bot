@@ -19,13 +19,17 @@ class Database:
     async def create_models(self) -> None:
         async with self.engine.begin() as connection:
             await connection.run_sync(Base.metadata.create_all)
-            await connection.run_sync(self._run_sqlite_migrations)
+            if connection.dialect.name == "sqlite":
+                await connection.run_sync(self._run_sqlite_migrations)
 
     async def dispose(self) -> None:
         await self.engine.dispose()
 
     @staticmethod
     def _run_sqlite_migrations(connection) -> None:
+        if connection.dialect.name != "sqlite":
+            return
+
         inspector = inspect(connection)
         table_names = set(inspector.get_table_names())
         if "users" in table_names:
@@ -142,6 +146,9 @@ class Database:
 
     @staticmethod
     def _get_table_sql(connection, table_name: str) -> str:
+        if connection.dialect.name != "sqlite":
+            return ""
+
         row = connection.execute(
             text(
                 "SELECT sql FROM sqlite_master "
@@ -155,6 +162,9 @@ class Database:
 
     @staticmethod
     def _ensure_users_schema(connection) -> None:
+        if connection.dialect.name != "sqlite":
+            return
+
         table_sql = Database._get_table_sql(connection, "users")
         if "worker" in table_sql:
             return
@@ -213,6 +223,9 @@ class Database:
 
     @staticmethod
     def _ensure_requests_schema(connection) -> None:
+        if connection.dialect.name != "sqlite":
+            return
+
         table_sql = Database._get_table_sql(connection, "requests")
         if "assigned" in table_sql and "source_type" in table_sql:
             return
