@@ -104,6 +104,15 @@ class UserService:
         result = await self._session.execute(statement)
         return list(result.scalars().all())
 
+    async def get_workers_by_company(self, company_id: int) -> list[User]:
+        statement = (
+            select(User)
+            .where(User.company_id == company_id, User.role == UserRole.WORKER)
+            .order_by(User.first_name.asc(), User.id.asc())
+        )
+        result = await self._session.execute(statement)
+        return list(result.scalars().all())
+
     async def list_users_for_actor(self, actor: User) -> list[User]:
         if actor.is_super_admin:
             statement = (
@@ -138,7 +147,9 @@ class UserService:
         if actor.is_super_admin:
             statement = select(User).where(User.role != UserRole.SUPER_ADMIN).where(User.id != actor.id)
             if target == "admins":
-                statement = statement.where(User.role.in_([UserRole.ADMIN, UserRole.OPERATOR]))
+                statement = statement.where(
+                    User.role.in_([UserRole.ADMIN, UserRole.OPERATOR, UserRole.WORKER])
+                )
             elif target == "users":
                 statement = statement.where(User.role == UserRole.USER)
             elif target != "all":
@@ -238,6 +249,67 @@ class UserService:
         await self._session.refresh(user)
         return user
 
+    async def assign_worker_to_company(self, actor: User, telegram_id: int, company_id: int) -> User:
+        if actor.role not in {UserRole.SUPER_ADMIN, UserRole.ADMIN}:
+            raise UserAccessError("Ishchi biriktirish faqat super admin va admin uchun.")
+
+        if actor.role == UserRole.ADMIN:
+            if actor.company_id is None or actor.company_id != company_id:
+                raise UserAccessError("Admin faqat o'z kompaniyasiga ishchi qo'sha oladi.")
+
+        return await self.assign_user_to_company(telegram_id, company_id, UserRole.WORKER)
+
+    async def list_workers_for_actor(self, actor: User, company_id: int | None = None) -> list[User]:
+        if actor.is_super_admin:
+            if company_id is None:
+                statement = (
+                    select(User)
+                    .options(selectinload(User.company))
+                    .where(User.role == UserRole.WORKER)
+                    .order_by(User.company_id.asc(), User.id.asc())
+                )
+            else:
+                statement = (
+                    select(User)
+                    .options(selectinload(User.company))
+                    .where(User.company_id == company_id, User.role == UserRole.WORKER)
+                    .order_by(User.id.asc())
+                )
+            result = await self._session.execute(statement)
+            return list(result.scalars().all())
+
+        if actor.role == UserRole.ADMIN and actor.company_id is not None:
+            statement = (
+                select(User)
+                .options(selectinload(User.company))
+                .where(User.company_id == actor.company_id, User.role == UserRole.WORKER)
+                .order_by(User.id.asc())
+            )
+            result = await self._session.execute(statement)
+            return list(result.scalars().all())
+
+        raise UserAccessError("Ishchilar bo'limi faqat super admin va admin uchun.")
+
+    async def get_workers_for_company_ids(
+        self,
+        company_id: int,
+        worker_ids: list[int],
+    ) -> list[User]:
+        if not worker_ids:
+            return []
+
+        statement = (
+            select(User)
+            .where(
+                User.company_id == company_id,
+                User.role == UserRole.WORKER,
+                User.id.in_(worker_ids),
+            )
+            .order_by(User.id.asc())
+        )
+        result = await self._session.execute(statement)
+        return list(result.scalars().all())
+
     async def update_phone_number(self, telegram_id: int, phone_number: str) -> User:
         user = await self._get_by_telegram_id(telegram_id)
         if user is None:
@@ -284,8 +356,8 @@ class UserService:
         if user.is_super_admin:
             raise UserRoleChangeError("Super admin kompaniya tanlamaydi.")
 
-        if user.role in {UserRole.ADMIN, UserRole.OPERATOR}:
-            raise UserRoleChangeError("Admin yoki operator kompaniyani o'zi tanlay olmaydi.")
+        if user.role in {UserRole.ADMIN, UserRole.OPERATOR, UserRole.WORKER}:
+            raise UserRoleChangeError("Admin, operator yoki worker kompaniyani o'zi tanlay olmaydi.")
 
         user.company_id = company_id
         await self._session.commit()

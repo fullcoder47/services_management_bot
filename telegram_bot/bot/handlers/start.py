@@ -237,7 +237,7 @@ async def _show_start_view(
         )
         return
 
-    if user.role in {UserRole.ADMIN, UserRole.OPERATOR}:
+    if user.role in {UserRole.ADMIN, UserRole.OPERATOR, UserRole.WORKER}:
         if company is None:
             await message.answer(
                 t(language, "manager_no_company"),
@@ -296,7 +296,12 @@ def _build_super_admin_text(user: User, created: bool) -> str:
 def _build_manager_text(user: User, company: Company, created: bool) -> str:
     language = user.ui_language
     created_text = t(language, "registered_new") if created else t(language, "registered_existing")
-    role_key = "role_admin" if user.role == UserRole.ADMIN else "role_operator"
+    if user.role == UserRole.ADMIN:
+        role_key = "role_admin"
+    elif user.role == UserRole.OPERATOR:
+        role_key = "role_operator"
+    else:
+        role_key = "role_worker"
     return t(
         language,
         "welcome_manager",

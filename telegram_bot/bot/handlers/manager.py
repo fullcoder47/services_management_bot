@@ -312,6 +312,8 @@ def _format_role(role: UserRole, language) -> str:
         return t(language, "role_admin")
     if role == UserRole.OPERATOR:
         return t(language, "role_operator")
+    if role == UserRole.WORKER:
+        return t(language, "role_worker")
     return t(language, "role_user")
 
 

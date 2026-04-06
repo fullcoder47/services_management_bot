@@ -11,6 +11,7 @@ from db.base import Base, TimestampMixin
 class UserRole(StrEnum):
     USER = "user"
     OPERATOR = "operator"
+    WORKER = "worker"
     ADMIN = "admin"
     SUPER_ADMIN = "super_admin"
 
@@ -59,7 +60,31 @@ class User(Base, TimestampMixin):
     )
 
     company: Mapped["Company | None"] = relationship("Company", back_populates="users")
-    requests: Mapped[list["Request"]] = relationship("Request", back_populates="user")
+    requests: Mapped[list["Request"]] = relationship(
+        "Request",
+        back_populates="user",
+        foreign_keys="Request.user_id",
+    )
+    created_admin_requests: Mapped[list["Request"]] = relationship(
+        "Request",
+        back_populates="creator_admin",
+        foreign_keys="Request.created_by_admin_id",
+    )
+    accepted_requests: Mapped[list["Request"]] = relationship(
+        "Request",
+        back_populates="accepted_by_worker",
+        foreign_keys="Request.accepted_by_worker_id",
+    )
+    completed_requests: Mapped[list["Request"]] = relationship(
+        "Request",
+        back_populates="completed_by_worker",
+        foreign_keys="Request.completed_by_worker_id",
+    )
+    assigned_requests: Mapped[list["Request"]] = relationship(
+        "Request",
+        secondary="request_workers",
+        back_populates="assigned_workers",
+    )
 
     @property
     def is_super_admin(self) -> bool:

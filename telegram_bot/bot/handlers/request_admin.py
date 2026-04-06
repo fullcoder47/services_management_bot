@@ -435,18 +435,29 @@ async def _build_request_list_view(
 async def _format_request_detail(request: Request, language) -> str:
     user_name = request.user.display_name if request.user is not None else "Unknown"
     company_name = request.company.name if request.company is not None else "Unknown company"
+    creator_admin = request.creator_admin.display_name if request.creator_admin is not None else "-"
+    assigned_workers = ", ".join(worker.display_name for worker in request.assigned_workers) or "-"
+    accepted_by_worker = request.accepted_by_worker.display_name if request.accepted_by_worker is not None else "-"
+    completed_by_worker = request.completed_by_worker.display_name if request.completed_by_worker is not None else "-"
     translator = TranslationService()
     translated_problem = await translator.translate_text(request.problem_text, language)
     translated_address = await translator.translate_text(request.address, language)
 
     lines = [
         f"<b>{t(language, 'request_detail_title', request_id=request.id)}</b>",
+        f"{t(language, 'request_detail_source')}: "
+        f"<b>{t(language, 'request_source_admin' if request.source_type.value == 'admin' else 'request_source_user')}</b>",
         f"{t(language, 'request_detail_status')}: <b>{RequestService.format_status(request.status, language)}</b>",
         f"{t(language, 'request_new_company')}: <b>{escape(company_name)}</b>",
         f"{t(language, 'request_new_user')}: <b>{escape(user_name)}</b>",
+        f"{t(language, 'request_detail_created_by')}: <b>{escape(creator_admin)}</b>",
         f"{t(language, 'request_new_phone')}: <b>{escape(request.phone)}</b>",
         f"{t(language, 'request_new_problem')}: <b>{escape(translated_problem)}</b>",
-        f"{t(language, 'request_new_address')}: <b>{escape(translated_address)}</b>",
+        f"{t(language, 'request_new_address')}: "
+        f"<b>{escape(translated_address or t(language, 'request_no_address'))}</b>",
+        f"{t(language, 'request_detail_assigned_workers')}: <b>{escape(assigned_workers)}</b>",
+        f"{t(language, 'request_detail_accepted_by_worker')}: <b>{escape(accepted_by_worker)}</b>",
+        f"{t(language, 'request_detail_completed_by_worker')}: <b>{escape(completed_by_worker)}</b>",
     ]
     if request.problem_image:
         lines.append(t(language, "request_detail_image"))
@@ -460,7 +471,7 @@ async def _format_request_detail(request: Request, language) -> str:
 
 
 async def _notify_user_status_update(bot: Bot, request: Request, language) -> None:
-    if request.user is None:
+    if request.source_type.value != "user" or request.user is None or request.user.role != UserRole.USER:
         return
 
     text = "\n".join(
@@ -476,15 +487,23 @@ async def _notify_user_status_update(bot: Bot, request: Request, language) -> No
 
 
 async def _notify_user_request_done(bot: Bot, request: Request) -> None:
-    if request.user is None:
+    if request.source_type.value != "user" or request.user is None or request.user.role != UserRole.USER:
         return
 
     language = request.user.ui_language
-    caption = (
-        f"{t(language, 'request_user_done_caption')}\n\n"
-        f"{t(language, 'request_done_note_label')}: <b>{escape(request.result_text or '')}</b>\n"
-        f"{t(language, 'request_done_photo_attached')}"
-    )
+    if request.completed_by_worker is not None:
+        caption = t(
+            language,
+            "worker_done_caption_with_name",
+            worker=escape(request.completed_by_worker.display_name),
+            note=escape(request.result_text or ""),
+        )
+    else:
+        caption = (
+            f"{t(language, 'request_user_done_caption')}\n\n"
+            f"{t(language, 'request_done_note_label')}: <b>{escape(request.result_text or '')}</b>\n"
+            f"{t(language, 'request_done_photo_attached')}"
+        )
     try:
         await bot.send_photo(
             chat_id=request.user.telegram_id,
@@ -502,7 +521,7 @@ async def _notify_user_request_done(bot: Bot, request: Request) -> None:
 
 
 async def _notify_user_request_rejected(bot: Bot, request: Request) -> None:
-    if request.user is None:
+    if request.source_type.value != "user" or request.user is None or request.user.role != UserRole.USER:
         return
 
     try:
@@ -595,6 +614,7 @@ async def _show_request_detail_message(
         request,
         language,
         can_reject=actor.role in {UserRole.SUPER_ADMIN, UserRole.ADMIN},
+        can_assign_workers=actor.role in {UserRole.SUPER_ADMIN, UserRole.ADMIN},
     )
 
     if not request.problem_image:

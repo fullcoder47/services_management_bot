@@ -65,6 +65,7 @@ def build_request_admin_actions_keyboard(
     language: UserLanguage,
     *,
     can_reject: bool = False,
+    can_assign_workers: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if request.status == RequestStatus.PENDING:
@@ -76,6 +77,11 @@ def build_request_admin_actions_keyboard(
         builder.button(
             text=t(language, "request_reject"),
             callback_data=RequestActionCallback(action="reject", request_id=request.id),
+        )
+    if can_assign_workers and request.status != RequestStatus.DONE:
+        builder.button(
+            text=t(language, "request_assign_workers"),
+            callback_data=RequestActionCallback(action="assign_workers", request_id=request.id),
         )
     if request.status != RequestStatus.DONE:
         builder.button(
@@ -131,6 +137,8 @@ def build_request_list_keyboard(
 def _status_icon(status: RequestStatus) -> str:
     if status == RequestStatus.PENDING:
         return "⏳"
+    if status == RequestStatus.ASSIGNED:
+        return "👷"
     if status == RequestStatus.IN_PROGRESS:
         return "🛠"
     return "✅"

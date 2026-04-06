@@ -13,6 +13,12 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
         keyboard.append(
             [
                 KeyboardButton(text=t(language, "menu_requests")),
+                KeyboardButton(text=t(language, "menu_create_request")),
+            ]
+        )
+        keyboard.append(
+            [
+                KeyboardButton(text=t(language, "menu_workers")),
                 KeyboardButton(text=t(language, "menu_users")),
             ]
         )
@@ -24,6 +30,12 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
         keyboard.append(
             [
                 KeyboardButton(text=t(language, "menu_requests")),
+                KeyboardButton(text=t(language, "menu_create_request")),
+            ]
+        )
+        keyboard.append(
+            [
+                KeyboardButton(text=t(language, "menu_workers")),
                 KeyboardButton(text=t(language, "menu_users")),
             ]
         )
@@ -33,6 +45,17 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
 
     if role == UserRole.OPERATOR:
         keyboard.append([KeyboardButton(text=t(language, "menu_requests"))])
+        keyboard.append([KeyboardButton(text=t(language, "menu_help"))])
+        return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
+    if role == UserRole.WORKER:
+        keyboard.append([KeyboardButton(text=t(language, "menu_worker_assigned"))])
+        keyboard.append(
+            [
+                KeyboardButton(text=t(language, "menu_worker_in_progress")),
+                KeyboardButton(text=t(language, "menu_worker_done")),
+            ]
+        )
         keyboard.append([KeyboardButton(text=t(language, "menu_help"))])
         return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 

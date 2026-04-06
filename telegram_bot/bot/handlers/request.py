@@ -397,6 +397,7 @@ async def _format_admin_new_request_text(
 
 
 def _format_user_request_detail(request: Request, language) -> str:
+    completed_by_worker = request.completed_by_worker.display_name if request.completed_by_worker is not None else ""
     lines = [
         f"<b>{t(language, 'request_detail_title', request_id=request.id)}</b>",
         f"{t(language, 'request_detail_status')}: <b>{RequestService.format_status(request.status, language)}</b>",
@@ -408,6 +409,10 @@ def _format_user_request_detail(request: Request, language) -> str:
         lines.append(t(language, "request_detail_image"))
     if request.status == RequestStatus.DONE:
         lines.append(f"{t(language, 'request_detail_done_note')}: <b>{escape(request.result_text or '')}</b>")
+        if completed_by_worker:
+            lines.append(
+                f"{t(language, 'request_detail_completed_by_worker')}: <b>{escape(completed_by_worker)}</b>"
+            )
         if request.completed_at is not None:
             lines.append(
                 f"{t(language, 'request_detail_done_at')}: <b>{request.completed_at.strftime('%Y-%m-%d %H:%M UTC')}</b>"
