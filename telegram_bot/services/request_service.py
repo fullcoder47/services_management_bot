@@ -198,6 +198,17 @@ class RequestService:
         await self._session.refresh(request)
         return await self.get_request_or_raise(request.id)
 
+    async def reject_request(self, request_id: int, actor: User) -> Request:
+        request = await self.get_request_or_raise(request_id)
+        self.ensure_management_access(actor, request)
+
+        if request.status == RequestStatus.DONE:
+            raise RequestStateError("Bajarilgan arizani rad qilib bo'lmaydi.")
+
+        await self._session.delete(request)
+        await self._session.commit()
+        return request
+
     def ensure_can_manage_requests(self, actor: User) -> None:
         if actor.role not in {UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OPERATOR}:
             raise RequestAccessDeniedError("Bu bo'lim faqat super admin, admin va operator uchun.")

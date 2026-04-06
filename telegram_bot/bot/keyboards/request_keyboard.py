@@ -60,12 +60,22 @@ def build_request_done_cancel_keyboard(request_id: int, language: UserLanguage) 
     return builder.as_markup()
 
 
-def build_request_admin_actions_keyboard(request: Request, language: UserLanguage) -> InlineKeyboardMarkup:
+def build_request_admin_actions_keyboard(
+    request: Request,
+    language: UserLanguage,
+    *,
+    can_reject: bool = False,
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     if request.status == RequestStatus.PENDING:
         builder.button(
             text=t(language, "request_accept"),
             callback_data=RequestActionCallback(action="accept", request_id=request.id),
+        )
+    if can_reject and request.status != RequestStatus.DONE:
+        builder.button(
+            text=t(language, "request_reject"),
+            callback_data=RequestActionCallback(action="reject", request_id=request.id),
         )
     if request.status != RequestStatus.DONE:
         builder.button(

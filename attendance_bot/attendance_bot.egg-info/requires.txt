@@ -1,6 +1,0 @@
-aiogram<4.0.0,>=3.20.0
-SQLAlchemy<3.0.0,>=2.0.38
-asyncpg<1.0.0,>=0.30.0
-alembic<2.0.0,>=1.15.0
-pydantic<3.0.0,>=2.10.0
-pydantic-settings<3.0.0,>=2.8.0

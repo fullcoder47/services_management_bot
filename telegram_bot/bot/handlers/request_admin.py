@@ -117,7 +117,7 @@ async def request_details_callback(
 
     await callback.answer()
     if callback.message is not None:
-        await _show_request_detail_message(callback.message, request, current_user.ui_language)
+        await _show_request_detail_message(callback.message, request, current_user)
 
 
 @router.callback_query(RequestActionCallback.filter(F.action == "accept"))
@@ -139,13 +139,38 @@ async def request_accept_callback(
 
     await callback.answer(t(current_user.ui_language, "request_accept_alert"))
     if callback.message is not None:
-        await _show_request_detail_message(callback.message, request, current_user.ui_language)
+        await _show_request_detail_message(callback.message, request, current_user)
 
     await _notify_user_status_update(
         callback.bot,
         request,
         request.user.ui_language if request.user is not None else current_user.ui_language,
     )
+
+
+@router.callback_query(RequestActionCallback.filter(F.action == "reject"))
+async def request_reject_callback(
+    callback: CallbackQuery,
+    callback_data: RequestActionCallback,
+    session: AsyncSession,
+) -> None:
+    current_user = await _authorize_manager_callback(callback, session)
+    if current_user is None:
+        return
+
+    request_service = RequestService(session)
+    try:
+        request = await request_service.reject_request(callback_data.request_id, current_user)
+    except (RequestNotFoundError, RequestAccessDeniedError, RequestStateError) as exc:
+        await callback.answer(str(exc), show_alert=True)
+        return
+
+    await _notify_user_request_rejected(callback.bot, request)
+    await callback.answer(t(current_user.ui_language, "request_reject_alert"))
+
+    text, keyboard = await _build_request_list_view(session, current_user)
+    if callback.message is not None:
+        await _show_request_message(callback.message, text, reply_markup=keyboard)
 
 
 @router.callback_query(RequestActionCallback.filter(F.action == "done"))
@@ -306,7 +331,7 @@ async def request_done_cancel(
     await state.clear()
     if callback.message is not None:
         await _safe_clear_reply_markup(callback.message)
-        await _show_request_detail_message(callback.message, request, current_user.ui_language)
+        await _show_request_detail_message(callback.message, request, current_user)
     await callback.answer(t(current_user.ui_language, "request_done_cancelled"))
 
 
@@ -363,7 +388,7 @@ async def request_done_confirm(
 
     if callback.message is not None:
         await _safe_clear_reply_markup(callback.message)
-        await _show_request_detail_message(callback.message, request, current_user.ui_language)
+        await _show_request_detail_message(callback.message, request, current_user)
     await callback.answer(t(current_user.ui_language, "request_done_alert"))
 
 
@@ -476,6 +501,19 @@ async def _notify_user_request_done(bot: Bot, request: Request) -> None:
             return
 
 
+async def _notify_user_request_rejected(bot: Bot, request: Request) -> None:
+    if request.user is None:
+        return
+
+    try:
+        await bot.send_message(
+            chat_id=request.user.telegram_id,
+            text=t(request.user.ui_language, "request_user_rejected"),
+        )
+    except Exception:
+        return
+
+
 async def _authorize_manager_message(
     message: Message,
     session: AsyncSession,
@@ -549,10 +587,15 @@ async def _show_request_message(message: Message, text: str, reply_markup=None) 
 async def _show_request_detail_message(
     message: Message,
     request: Request,
-    language,
+    actor: User,
 ) -> None:
+    language = actor.ui_language
     detail_text = await _format_request_detail(request, language)
-    keyboard = build_request_admin_actions_keyboard(request, language)
+    keyboard = build_request_admin_actions_keyboard(
+        request,
+        language,
+        can_reject=actor.role in {UserRole.SUPER_ADMIN, UserRole.ADMIN},
+    )
 
     if not request.problem_image:
         await _show_request_message(message, detail_text, reply_markup=keyboard)
