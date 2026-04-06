@@ -72,6 +72,7 @@ def build_admin_request_workers_keyboard(
     language: UserLanguage,
     *,
     allow_confirm: bool = True,
+    allow_skip: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for worker in workers:
@@ -85,6 +86,12 @@ def build_admin_request_workers_keyboard(
         builder.button(
             text=t(language, "request_done_confirm"),
             callback_data=AdminRequestConfirmCallback(action="confirm_workers"),
+        )
+
+    if allow_skip:
+        builder.button(
+            text=t(language, "skip"),
+            callback_data=AdminRequestMenuCallback(action="skip_workers"),
         )
 
     builder.button(

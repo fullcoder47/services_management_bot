@@ -108,6 +108,7 @@ async def assign_workers_start(
         request_id=request.id,
         company_id=request.company_id,
         selected_worker_ids=list(selected_ids),
+        use_all_workers=False,
     )
 
     if callback.message is not None:
@@ -120,6 +121,7 @@ async def assign_workers_start(
                 selected_ids,
                 actor.ui_language,
                 allow_confirm=bool(selected_ids),
+                allow_skip=False,
             ),
         )
     await callback.answer()
@@ -282,6 +284,7 @@ async def admin_request_toggle_worker(
         return
 
     selected_ids = set(await _extract_selected_worker_ids(state))
+    flow_mode = str((await state.get_data()).get("flow_mode", "create"))
     if callback_data.worker_id in selected_ids:
         selected_ids.remove(callback_data.worker_id)
     else:
@@ -299,6 +302,7 @@ async def admin_request_toggle_worker(
                 selected_ids,
                 actor.ui_language,
                 allow_confirm=bool(selected_ids),
+                allow_skip=flow_mode == "create",
             ),
         )
     await callback.answer()
@@ -328,7 +332,46 @@ async def admin_request_confirm_workers(
         await callback.answer(t(actor.ui_language, "admin_request_workers_empty"), show_alert=True)
         return
 
+    await state.update_data(use_all_workers=False)
     await state.update_data(selected_worker_ids=[worker.id for worker in workers])
+    await state.set_state(AdminRequestStates.waiting_for_confirmation)
+
+    if callback.message is not None:
+        await _show_text_message(
+            callback.message,
+            await _build_confirmation_text(actor, state, workers, session),
+            reply_markup=build_admin_request_create_confirm_keyboard(actor.ui_language),
+        )
+    await callback.answer()
+
+
+@router.callback_query(
+    AdminRequestMenuCallback.filter(F.action == "skip_workers"),
+    AdminRequestStates.waiting_for_workers,
+)
+async def admin_request_skip_workers(
+    callback: CallbackQuery,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    actor = await _authorize_admin_callback(callback, session)
+    if actor is None:
+        return
+
+    data = await state.get_data()
+    flow_mode = str(data.get("flow_mode", "create"))
+    if flow_mode != "create":
+        await callback.answer(t(actor.ui_language, "request_data_missing"), show_alert=True)
+        return
+
+    company_id = await _extract_company_id(state)
+    if company_id is None:
+        await state.clear()
+        await callback.answer(t(actor.ui_language, "workers_choose_company"), show_alert=True)
+        return
+
+    workers = await UserService(session).list_workers_for_actor(actor, company_id)
+    await state.update_data(use_all_workers=True, selected_worker_ids=[])
     await state.set_state(AdminRequestStates.waiting_for_confirmation)
 
     if callback.message is not None:
@@ -404,17 +447,23 @@ async def admin_request_submit(
     flow_mode = str(data.get("flow_mode", "create"))
     company_id = data.get("company_id")
     selected_ids = data.get("selected_worker_ids", [])
-    if not isinstance(company_id, int) or not isinstance(selected_ids, list) or not selected_ids:
+    use_all_workers = bool(data.get("use_all_workers", False))
+    if not isinstance(company_id, int) or not isinstance(selected_ids, list):
         await state.clear()
         await callback.answer(t(actor.ui_language, "request_data_missing"), show_alert=True)
         return
 
     user_service = UserService(session)
-    workers = await user_service.get_workers_for_company_ids(company_id, [int(worker_id) for worker_id in selected_ids])
-    if not workers:
-        await state.clear()
-        await callback.answer(t(actor.ui_language, "admin_request_workers_empty"), show_alert=True)
-        return
+    if flow_mode == "assign":
+        workers = await user_service.get_workers_for_company_ids(company_id, [int(worker_id) for worker_id in selected_ids])
+        if not workers:
+            await state.clear()
+            await callback.answer(t(actor.ui_language, "admin_request_workers_empty"), show_alert=True)
+            return
+    elif use_all_workers:
+        workers = await user_service.list_workers_for_actor(actor, company_id)
+    else:
+        workers = await user_service.get_workers_for_company_ids(company_id, [int(worker_id) for worker_id in selected_ids])
 
     request_service = RequestService(session)
     try:
@@ -472,6 +521,7 @@ async def admin_request_back_to_workers(
         return
 
     selected_ids = set(await _extract_selected_worker_ids(state))
+    flow_mode = str((await state.get_data()).get("flow_mode", "create"))
     workers = await UserService(session).list_workers_for_actor(actor, company_id)
     if callback.message is not None:
         text = await _build_workers_selection_text(actor, session, company_id, selected_ids)
@@ -483,6 +533,7 @@ async def admin_request_back_to_workers(
                 selected_ids,
                 actor.ui_language,
                 allow_confirm=bool(selected_ids),
+                allow_skip=flow_mode == "create",
             ),
         )
     await callback.answer()
@@ -540,11 +591,17 @@ async def _show_worker_selection_message(
         return
 
     await state.set_state(AdminRequestStates.waiting_for_workers)
-    await state.update_data(selected_worker_ids=[])
+    await state.update_data(selected_worker_ids=[], use_all_workers=False)
     workers = await UserService(session).list_workers_for_actor(actor, company_id)
     await message.answer(
         await _build_workers_selection_text(actor, session, company_id, set()),
-        reply_markup=build_admin_request_workers_keyboard(workers, set(), actor.ui_language, allow_confirm=False),
+        reply_markup=build_admin_request_workers_keyboard(
+            workers,
+            set(),
+            actor.ui_language,
+            allow_confirm=False,
+            allow_skip=True,
+        ),
     )
 
 
@@ -559,12 +616,18 @@ async def _show_worker_selection_callback(
         return
 
     await state.set_state(AdminRequestStates.waiting_for_workers)
-    await state.update_data(selected_worker_ids=[])
+    await state.update_data(selected_worker_ids=[], use_all_workers=False)
     workers = await UserService(session).list_workers_for_actor(actor, company_id)
     await _show_text_message(
         message,
         await _build_workers_selection_text(actor, session, company_id, set()),
-        reply_markup=build_admin_request_workers_keyboard(workers, set(), actor.ui_language, allow_confirm=False),
+        reply_markup=build_admin_request_workers_keyboard(
+            workers,
+            set(),
+            actor.ui_language,
+            allow_confirm=False,
+            allow_skip=True,
+        ),
     )
 
 
@@ -599,7 +662,13 @@ async def _build_confirmation_text(
     data = await state.get_data()
     company_id = int(data.get("company_id"))
     company = await CompanyService(session).get_company(company_id)
-    worker_names = ", ".join(escape(worker.display_name) for worker in workers)
+    use_all_workers = bool(data.get("use_all_workers", False))
+    if use_all_workers and workers:
+        worker_names = t(actor.ui_language, "admin_request_all_workers")
+    elif workers:
+        worker_names = ", ".join(escape(worker.display_name) for worker in workers)
+    else:
+        worker_names = t(actor.ui_language, "admin_request_no_workers_assigned")
     flow_mode = str(data.get("flow_mode", "create"))
 
     lines = [

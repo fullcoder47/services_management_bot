@@ -258,8 +258,6 @@ class RequestService:
             raise RequestValidationError("Telefon raqami majburiy.")
         if not problem_text:
             raise RequestValidationError("Muammo tavsifi majburiy.")
-        if not workers:
-            raise RequestValidationError("Kamida bitta worker tanlanishi kerak.")
 
         request = Request(
             user_id=actor.id,
@@ -270,7 +268,7 @@ class RequestService:
             address=address,
             problem_image=problem_image or None,
             source_type=RequestSourceType.ADMIN,
-            status=RequestStatus.ASSIGNED,
+            status=RequestStatus.ASSIGNED if workers else RequestStatus.PENDING,
             result_text=None,
             result_image="",
             completed_at=None,
