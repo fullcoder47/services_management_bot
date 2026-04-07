@@ -13,7 +13,7 @@ from services.user_service import UserService
 
 
 class SubscriptionMiddleware(BaseMiddleware):
-    allowed_support_commands = {"/help", "/yordam"}
+    allowed_support_commands = {"/help", "/yordam", "/settings", "/sozlamalar"}
 
     async def __call__(
         self,
@@ -63,6 +63,14 @@ class SubscriptionMiddleware(BaseMiddleware):
             await event.answer(text)
 
     def _is_support_request(self, event: TelegramObject) -> bool:
+        if isinstance(event, CallbackQuery):
+            data = event.data or ""
+            return (
+                data.startswith("settings_menu:")
+                or data.startswith("settings_language:")
+                or data.startswith("settings_company:")
+            )
+
         if not isinstance(event, Message):
             return False
 
@@ -76,8 +84,12 @@ class SubscriptionMiddleware(BaseMiddleware):
         dispatcher_buttons = {
             variant.lower() for variant in button_variants("menu_call_dispatcher")
         }
+        settings_buttons = {
+            variant.lower() for variant in button_variants("menu_settings")
+        }
         return (
             command in self.allowed_support_commands
             or text in help_buttons
             or text in dispatcher_buttons
+            or text in settings_buttons
         )

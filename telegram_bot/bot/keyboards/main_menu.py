@@ -23,7 +23,12 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
             ]
         )
         keyboard.append([KeyboardButton(text=t(language, "menu_broadcast"))])
-        keyboard.append([KeyboardButton(text=t(language, "menu_help"))])
+        keyboard.append(
+            [
+                KeyboardButton(text=t(language, "menu_help")),
+                KeyboardButton(text=t(language, "menu_settings")),
+            ]
+        )
         return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
     if role == UserRole.ADMIN:
@@ -40,12 +45,22 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
             ]
         )
         keyboard.append([KeyboardButton(text=t(language, "menu_broadcast"))])
-        keyboard.append([KeyboardButton(text=t(language, "menu_help"))])
+        keyboard.append(
+            [
+                KeyboardButton(text=t(language, "menu_help")),
+                KeyboardButton(text=t(language, "menu_settings")),
+            ]
+        )
         return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
     if role == UserRole.OPERATOR:
         keyboard.append([KeyboardButton(text=t(language, "menu_requests"))])
-        keyboard.append([KeyboardButton(text=t(language, "menu_help"))])
+        keyboard.append(
+            [
+                KeyboardButton(text=t(language, "menu_help")),
+                KeyboardButton(text=t(language, "menu_settings")),
+            ]
+        )
         return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
     if role == UserRole.WORKER:
@@ -56,7 +71,12 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
                 KeyboardButton(text=t(language, "menu_worker_done")),
             ]
         )
-        keyboard.append([KeyboardButton(text=t(language, "menu_help"))])
+        keyboard.append(
+            [
+                KeyboardButton(text=t(language, "menu_help")),
+                KeyboardButton(text=t(language, "menu_settings")),
+            ]
+        )
         return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
     if has_company:
@@ -64,5 +84,10 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
         keyboard.append([KeyboardButton(text=t(language, "menu_my_requests"))])
         keyboard.append([KeyboardButton(text=t(language, "menu_call_dispatcher"))])
 
-    keyboard.append([KeyboardButton(text=t(language, "menu_help"))])
+    keyboard.append(
+        [
+            KeyboardButton(text=t(language, "menu_help")),
+            KeyboardButton(text=t(language, "menu_settings")),
+        ]
+    )
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)

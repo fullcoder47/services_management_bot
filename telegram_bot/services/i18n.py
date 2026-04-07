@@ -588,7 +588,79 @@ EXTRA_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
     },
 }
 
+SETTINGS_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
+    UserLanguage.UZ: {
+        "menu_settings": "⚙️ Sozlamalar",
+        "settings_title": "⚙️ Sozlamalar",
+        "settings_change_language": "🌐 Tilni o'zgartirish",
+        "settings_change_phone": "📱 Telefonni yangilash",
+        "settings_change_company": "🏢 Kompaniyani almashtirish",
+        "settings_back": "⬅️ Orqaga",
+        "settings_language_prompt": "Yangi tilni tanlang.",
+        "settings_language_saved": "✅ Til yangilandi.",
+        "settings_phone_prompt": "Yangi telefon raqamingizni yuboring yoki pastdagi tugma bilan ulashing.",
+        "settings_phone_saved": "✅ Telefon raqami yangilandi.",
+        "settings_company_prompt": "Faol kompaniyalardan birini tanlang.",
+        "settings_company_saved": "✅ Kompaniya yangilandi: <b>{company}</b>",
+        "settings_company_unavailable": "❌ Bu kompaniya hozir faol emas.",
+        "settings_company_denied": "Bu sozlama siz uchun mavjud emas.",
+        "settings_no_companies": "Hozircha faol kompaniyalar mavjud emas.",
+        "settings_not_set": "Kiritilmagan",
+        "settings_role_line": "Rol: <b>{role}</b>",
+        "settings_phone_line": "Telefon: <b>{phone}</b>",
+        "settings_language_line": "Til: <b>{language_name}</b>",
+        "settings_company_line": "Kompaniya: <b>{company}</b>",
+    },
+    UserLanguage.RU: {
+        "menu_settings": "⚙️ Настройки",
+        "settings_title": "⚙️ Настройки",
+        "settings_change_language": "🌐 Сменить язык",
+        "settings_change_phone": "📱 Обновить телефон",
+        "settings_change_company": "🏢 Сменить компанию",
+        "settings_back": "⬅️ Назад",
+        "settings_language_prompt": "Выберите новый язык.",
+        "settings_language_saved": "✅ Язык обновлён.",
+        "settings_phone_prompt": "Отправьте новый номер телефона или поделитесь им кнопкой ниже.",
+        "settings_phone_saved": "✅ Номер телефона обновлён.",
+        "settings_company_prompt": "Выберите одну из активных компаний.",
+        "settings_company_saved": "✅ Компания обновлена: <b>{company}</b>",
+        "settings_company_unavailable": "❌ Эта компания сейчас неактивна.",
+        "settings_company_denied": "Эта настройка вам недоступна.",
+        "settings_no_companies": "Сейчас нет активных компаний.",
+        "settings_not_set": "Не указано",
+        "settings_role_line": "Роль: <b>{role}</b>",
+        "settings_phone_line": "Телефон: <b>{phone}</b>",
+        "settings_language_line": "Язык: <b>{language_name}</b>",
+        "settings_company_line": "Компания: <b>{company}</b>",
+    },
+    UserLanguage.EN: {
+        "menu_settings": "⚙️ Settings",
+        "settings_title": "⚙️ Settings",
+        "settings_change_language": "🌐 Change language",
+        "settings_change_phone": "📱 Update phone",
+        "settings_change_company": "🏢 Change company",
+        "settings_back": "⬅️ Back",
+        "settings_language_prompt": "Choose a new language.",
+        "settings_language_saved": "✅ Language updated.",
+        "settings_phone_prompt": "Send your new phone number or share it using the button below.",
+        "settings_phone_saved": "✅ Phone number updated.",
+        "settings_company_prompt": "Choose one of the active companies.",
+        "settings_company_saved": "✅ Company updated: <b>{company}</b>",
+        "settings_company_unavailable": "❌ This company is currently inactive.",
+        "settings_company_denied": "This setting is not available for your role.",
+        "settings_no_companies": "There are no active companies right now.",
+        "settings_not_set": "Not set",
+        "settings_role_line": "Role: <b>{role}</b>",
+        "settings_phone_line": "Phone: <b>{phone}</b>",
+        "settings_language_line": "Language: <b>{language_name}</b>",
+        "settings_company_line": "Company: <b>{company}</b>",
+    },
+}
+
 for language, mapping in EXTRA_TRANSLATIONS.items():
+    TRANSLATIONS[language].update(mapping)
+
+for language, mapping in SETTINGS_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
 
