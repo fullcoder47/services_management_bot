@@ -7,7 +7,6 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message, User as AiogramUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from bot.keyboards.user_keyboard import build_dispatcher_call_keyboard
 from db.models import User
 from services.company_service import CompanyService
 from services.i18n import button_variants, t
@@ -45,8 +44,8 @@ async def dispatcher_call_handler(
     await message.answer(
         f"{t(language, 'dispatcher_call_title')}\n\n"
         f"{t(language, 'dispatcher_call_text', company=escape(company.name), phone=escape(dial_phone))}",
-        reply_markup=build_dispatcher_call_keyboard(dial_phone, language),
     )
+    await message.answer(f"📞 {dial_phone}")
 
     try:
         contact_name = (company.name[:64] or "Dispatcher").strip()
