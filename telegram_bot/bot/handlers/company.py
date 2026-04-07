@@ -30,7 +30,7 @@ from services.company_service import (
     normalize_utc_datetime,
 )
 from services.i18n import button_variants
-from services.user_service import TelegramUserDTO, UserService
+from services.user_service import TelegramUserDTO, UserService, UserValidationError
 
 
 router = Router(name=__name__)
@@ -38,6 +38,7 @@ router = Router(name=__name__)
 
 class CompanyManagementStates(StatesGroup):
     waiting_for_name = State()
+    waiting_for_dispatcher_phone = State()
     waiting_for_plan = State()
 
 
@@ -114,6 +115,35 @@ async def capture_company_name(
         return
 
     await state.update_data(company_name=company_name)
+    await state.set_state(CompanyManagementStates.waiting_for_dispatcher_phone)
+    await message.answer(
+        "Dispecherlik telefon raqamini yuboring.",
+        reply_markup=build_company_cancel_keyboard(),
+    )
+
+
+@router.message(CompanyManagementStates.waiting_for_dispatcher_phone)
+async def capture_company_dispatcher_phone(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    admin = await _authorize_super_admin_message(message, session)
+    if admin is None:
+        return
+
+    dispatcher_phone = (message.text or "").strip()
+    if not dispatcher_phone:
+        await message.answer("Dispecherlik telefon raqami majburiy. Qaytadan yuboring.")
+        return
+
+    try:
+        normalized_dispatcher_phone = UserService.normalize_phone_number(dispatcher_phone)
+    except UserValidationError:
+        await message.answer("Telefon raqami noto'g'ri formatda. Qaytadan yuboring.")
+        return
+
+    await state.update_data(dispatcher_phone=normalized_dispatcher_phone)
     await state.set_state(CompanyManagementStates.waiting_for_plan)
     await message.answer(
         "Kompaniya tarifini tanlang.",
@@ -134,6 +164,7 @@ async def create_company_from_plan(
 
     data = await state.get_data()
     company_name = str(data.get("company_name", "")).strip()
+    dispatcher_phone = str(data.get("dispatcher_phone", "")).strip()
     if not company_name:
         await state.clear()
         if callback.message is not None:
@@ -141,12 +172,23 @@ async def create_company_from_plan(
             await _safe_edit_text(callback.message, text, reply_markup=keyboard)
         await callback.answer("Kompaniya nomi topilmadi. Qaytadan boshlang.", show_alert=True)
         return
+    if not dispatcher_phone:
+        await state.set_state(CompanyManagementStates.waiting_for_dispatcher_phone)
+        if callback.message is not None:
+            await _safe_edit_text(
+                callback.message,
+                "Dispecherlik telefon raqami topilmadi. Qaytadan yuboring.",
+                reply_markup=build_company_cancel_keyboard(),
+            )
+        await callback.answer("Dispecherlik telefon raqami kerak.", show_alert=True)
+        return
 
     company_service = CompanyService(session)
     try:
         company = await company_service.create_company(
             CreateCompanyDTO(
                 name=company_name,
+                dispatcher_phone=dispatcher_phone,
                 plan=CompanyPlan(callback_data.plan),
             )
         )
@@ -391,6 +433,7 @@ def _format_company_details(company: Company) -> str:
     return (
         f"<b>Kompaniya #{company.id}</b>\n"
         f"Nomi: <b>{escape(company.name)}</b>\n"
+        f"Dispecher telefoni: <b>{escape(company.dispatcher_phone or 'Kiritilmagan')}</b>\n"
         f"Tarifi: <b>{_format_plan(company.plan)}</b>\n"
         f"Holati: <b>{_format_status(company)}</b>\n"
         f"Obuna muddati: <b>{_format_subscription_end(company.subscription_end)}</b>\n"

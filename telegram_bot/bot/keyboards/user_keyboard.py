@@ -82,3 +82,16 @@ def build_user_request_back_keyboard(language: UserLanguage) -> InlineKeyboardMa
     )
     builder.adjust(1)
     return builder.as_markup()
+
+
+def build_dispatcher_call_keyboard(
+    phone_number: str,
+    language: UserLanguage,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=t(language, "dispatcher_call_button"),
+        url=f"tel:{phone_number}",
+    )
+    builder.adjust(1)
+    return builder.as_markup()

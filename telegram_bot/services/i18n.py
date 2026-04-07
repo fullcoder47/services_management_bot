@@ -372,6 +372,11 @@ TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
 EXTRA_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
     UserLanguage.UZ: {
         "role_worker": "ishchi",
+        "menu_call_dispatcher": "📞 Dispecherga qo'ng'iroq",
+        "dispatcher_call_title": "📞 Dispecher bilan bog'lanish",
+        "dispatcher_call_text": "<b>{company}</b> dispecherlik raqami:\n<b>{phone}</b>\n\nPastdagi tugma orqali qo'ng'iroq qilishingiz mumkin.",
+        "dispatcher_call_button": "📞 Qo'ng'iroq qilish",
+        "dispatcher_phone_missing": "Bu kompaniya uchun dispecherlik raqami hali kiritilmagan.",
         "menu_create_request": "📝 Ariza yaratish",
         "menu_workers": "👷 Ishchilar",
         "menu_worker_assigned": "📥 Menga biriktirilgan arizalar",
@@ -439,6 +444,11 @@ EXTRA_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
     },
     UserLanguage.RU: {
         "role_worker": "работник",
+        "menu_call_dispatcher": "📞 Позвонить диспетчеру",
+        "dispatcher_call_title": "📞 Связь с диспетчером",
+        "dispatcher_call_text": "Номер диспетчера компании <b>{company}</b>:\n<b>{phone}</b>\n\nВы можете позвонить по кнопке ниже.",
+        "dispatcher_call_button": "📞 Позвонить",
+        "dispatcher_phone_missing": "Для этой компании номер диспетчера ещё не указан.",
         "menu_create_request": "📝 Создать заявку",
         "menu_workers": "👷 Работники",
         "menu_worker_assigned": "📥 Назначенные мне заявки",
@@ -506,6 +516,11 @@ EXTRA_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
     },
     UserLanguage.EN: {
         "role_worker": "worker",
+        "menu_call_dispatcher": "📞 Call dispatcher",
+        "dispatcher_call_title": "📞 Contact dispatcher",
+        "dispatcher_call_text": "Dispatcher phone for <b>{company}</b>:\n<b>{phone}</b>\n\nYou can place the call using the button below.",
+        "dispatcher_call_button": "📞 Call now",
+        "dispatcher_phone_missing": "The dispatcher phone number has not been added for this company yet.",
         "menu_create_request": "📝 Create request",
         "menu_workers": "👷 Workers",
         "menu_worker_assigned": "📥 Assigned to me",

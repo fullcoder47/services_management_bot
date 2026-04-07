@@ -19,6 +19,7 @@ class Company(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    dispatcher_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
     plan: Mapped[CompanyPlan] = mapped_column(
         Enum(
             CompanyPlan,

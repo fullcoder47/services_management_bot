@@ -73,4 +73,11 @@ class SubscriptionMiddleware(BaseMiddleware):
         command = text.split(maxsplit=1)[0]
         command = command.split("@", maxsplit=1)[0]
         help_buttons = {variant.lower() for variant in button_variants("menu_help")}
-        return command in self.allowed_support_commands or text in help_buttons
+        dispatcher_buttons = {
+            variant.lower() for variant in button_variants("menu_call_dispatcher")
+        }
+        return (
+            command in self.allowed_support_commands
+            or text in help_buttons
+            or text in dispatcher_buttons
+        )

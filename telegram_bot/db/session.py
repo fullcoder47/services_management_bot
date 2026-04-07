@@ -34,6 +34,13 @@ class Database:
 
         inspector = inspect(connection)
         table_names = set(inspector.get_table_names())
+        if "companies" in table_names:
+            company_columns = {column["name"] for column in inspector.get_columns("companies")}
+            if "dispatcher_phone" not in company_columns:
+                connection.execute(
+                    text("ALTER TABLE companies ADD COLUMN dispatcher_phone VARCHAR(32)")
+                )
+
         if "users" in table_names:
             user_columns = {column["name"] for column in inspector.get_columns("users")}
             if "company_id" not in user_columns:
@@ -153,6 +160,14 @@ class Database:
 
         inspector = inspect(connection)
         table_names = set(inspector.get_table_names())
+        if "companies" in table_names:
+            connection.execute(
+                text(
+                    "ALTER TABLE companies "
+                    "ADD COLUMN IF NOT EXISTS dispatcher_phone VARCHAR(32)"
+                )
+            )
+
         if "users" in table_names:
             connection.execute(
                 text("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id INTEGER")

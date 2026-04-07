@@ -7,6 +7,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Company, CompanyPlan, User
+from services.user_service import UserService, UserValidationError
 
 
 class CompanyServiceError(Exception):
@@ -24,6 +25,7 @@ class CompanyNotFoundError(CompanyServiceError):
 @dataclass(slots=True)
 class CreateCompanyDTO:
     name: str
+    dispatcher_phone: str
     plan: CompanyPlan
 
 
@@ -80,12 +82,20 @@ class CompanyService:
         if not normalized_name:
             raise CompanyServiceError("Kompaniya nomi bo'sh bo'lishi mumkin emas.")
 
+        try:
+            normalized_dispatcher_phone = UserService.normalize_phone_number(
+                payload.dispatcher_phone
+            )
+        except UserValidationError as exc:
+            raise CompanyServiceError(str(exc)) from exc
+
         existing = await self._find_by_name(normalized_name)
         if existing is not None:
             raise CompanyAlreadyExistsError("Bu nomdagi kompaniya allaqachon mavjud.")
 
         company = Company(
             name=normalized_name,
+            dispatcher_phone=normalized_dispatcher_phone,
             plan=payload.plan,
             is_active=False,
             subscription_end=None,

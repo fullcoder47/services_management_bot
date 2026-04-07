@@ -62,6 +62,7 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
     if has_company:
         keyboard.append([KeyboardButton(text=t(language, "menu_leave_request"))])
         keyboard.append([KeyboardButton(text=t(language, "menu_my_requests"))])
+        keyboard.append([KeyboardButton(text=t(language, "menu_call_dispatcher"))])
 
     keyboard.append([KeyboardButton(text=t(language, "menu_help"))])
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
