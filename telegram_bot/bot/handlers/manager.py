@@ -16,6 +16,7 @@ from bot.keyboards.manager_keyboard import (
 from bot.states import BroadcastStates
 from db.models import User, UserRole
 from services.i18n import button_variants, t
+from services.translation_service import TranslationService
 from services.user_service import TelegramUserDTO, UserAccessError, UserService
 
 
@@ -136,37 +137,71 @@ async def broadcast_send(
 
     sent_count = 0
     failed_count = 0
+    translation_service = TranslationService()
+    translation_cache: dict[tuple[str, str], str] = {}
     for recipient in recipients:
         try:
             if content_type == "text":
-                await message.bot.send_message(
-                    chat_id=recipient.telegram_id,
+                translated_text, translated_entities = await _prepare_broadcast_content(
                     text=payload["text"],
                     entities=payload["entities"],
+                    source_language=actor.ui_language,
+                    target_language=recipient.ui_language,
+                    translation_service=translation_service,
+                    cache=translation_cache,
+                )
+                await message.bot.send_message(
+                    chat_id=recipient.telegram_id,
+                    text=translated_text,
+                    entities=translated_entities,
                     parse_mode=None,
                 )
             elif content_type == "photo":
+                translated_caption, translated_caption_entities = await _prepare_broadcast_content(
+                    text=payload["caption"],
+                    entities=payload["caption_entities"],
+                    source_language=actor.ui_language,
+                    target_language=recipient.ui_language,
+                    translation_service=translation_service,
+                    cache=translation_cache,
+                )
                 await message.bot.send_photo(
                     chat_id=recipient.telegram_id,
                     photo=payload["file_id"],
-                    caption=payload["caption"],
-                    caption_entities=payload["caption_entities"],
+                    caption=translated_caption,
+                    caption_entities=translated_caption_entities,
                     parse_mode=None,
                 )
             elif content_type == "video":
+                translated_caption, translated_caption_entities = await _prepare_broadcast_content(
+                    text=payload["caption"],
+                    entities=payload["caption_entities"],
+                    source_language=actor.ui_language,
+                    target_language=recipient.ui_language,
+                    translation_service=translation_service,
+                    cache=translation_cache,
+                )
                 await message.bot.send_video(
                     chat_id=recipient.telegram_id,
                     video=payload["file_id"],
-                    caption=payload["caption"],
-                    caption_entities=payload["caption_entities"],
+                    caption=translated_caption,
+                    caption_entities=translated_caption_entities,
                     parse_mode=None,
                 )
             elif content_type == "voice":
+                translated_caption, translated_caption_entities = await _prepare_broadcast_content(
+                    text=payload["caption"],
+                    entities=payload["caption_entities"],
+                    source_language=actor.ui_language,
+                    target_language=recipient.ui_language,
+                    translation_service=translation_service,
+                    cache=translation_cache,
+                )
                 await message.bot.send_voice(
                     chat_id=recipient.telegram_id,
                     voice=payload["file_id"],
-                    caption=payload["caption"],
-                    caption_entities=payload["caption_entities"],
+                    caption=translated_caption,
+                    caption_entities=translated_caption_entities,
                     parse_mode=None,
                 )
             elif content_type == "video_note":
@@ -175,19 +210,35 @@ async def broadcast_send(
                     video_note=payload["file_id"],
                 )
             elif content_type == "audio":
+                translated_caption, translated_caption_entities = await _prepare_broadcast_content(
+                    text=payload["caption"],
+                    entities=payload["caption_entities"],
+                    source_language=actor.ui_language,
+                    target_language=recipient.ui_language,
+                    translation_service=translation_service,
+                    cache=translation_cache,
+                )
                 await message.bot.send_audio(
                     chat_id=recipient.telegram_id,
                     audio=payload["file_id"],
-                    caption=payload["caption"],
-                    caption_entities=payload["caption_entities"],
+                    caption=translated_caption,
+                    caption_entities=translated_caption_entities,
                     parse_mode=None,
                 )
             elif content_type == "document":
+                translated_caption, translated_caption_entities = await _prepare_broadcast_content(
+                    text=payload["caption"],
+                    entities=payload["caption_entities"],
+                    source_language=actor.ui_language,
+                    target_language=recipient.ui_language,
+                    translation_service=translation_service,
+                    cache=translation_cache,
+                )
                 await message.bot.send_document(
                     chat_id=recipient.telegram_id,
                     document=payload["file_id"],
-                    caption=payload["caption"],
-                    caption_entities=payload["caption_entities"],
+                    caption=translated_caption,
+                    caption_entities=translated_caption_entities,
                     parse_mode=None,
                 )
             sent_count += 1
@@ -224,6 +275,48 @@ def _extract_media_payload(file_id: str, message: Message) -> dict[str, object]:
         "caption": message.caption or None,
         "caption_entities": message.caption_entities,
     }
+
+
+async def _prepare_broadcast_content(
+    text: str | None,
+    entities,
+    source_language,
+    target_language,
+    translation_service: TranslationService,
+    cache: dict[tuple[str, str], str],
+) -> tuple[str | None, object]:
+    if not text:
+        return text, entities
+
+    translated_text = await _translate_broadcast_text(
+        text=text,
+        source_language=source_language,
+        target_language=target_language,
+        translation_service=translation_service,
+        cache=cache,
+    )
+    if translated_text != text:
+        return translated_text, None
+    return text, entities
+
+
+async def _translate_broadcast_text(
+    text: str,
+    source_language,
+    target_language,
+    translation_service: TranslationService,
+    cache: dict[tuple[str, str], str],
+) -> str:
+    if source_language == target_language:
+        return text
+
+    cache_key = (target_language.value, text)
+    if cache_key not in cache:
+        cache[cache_key] = await translation_service.translate_text(
+            text=text,
+            target_language=target_language,
+        )
+    return cache[cache_key]
 
 
 async def _build_users_text(session: AsyncSession, actor: User) -> str:
