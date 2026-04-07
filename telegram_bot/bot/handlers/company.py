@@ -26,6 +26,7 @@ from services.company_service import (
     CompanyAlreadyExistsError,
     CompanyNotFoundError,
     CompanyService,
+    CompanyServiceError,
     CreateCompanyDTO,
     normalize_utc_datetime,
 )
@@ -40,6 +41,7 @@ class CompanyManagementStates(StatesGroup):
     waiting_for_name = State()
     waiting_for_dispatcher_phone = State()
     waiting_for_plan = State()
+    waiting_for_dispatcher_phone_update = State()
 
 
 @router.message(Command("companies"))
@@ -139,8 +141,8 @@ async def capture_company_dispatcher_phone(
 
     try:
         normalized_dispatcher_phone = UserService.normalize_phone_number(dispatcher_phone)
-    except UserValidationError:
-        await message.answer("Telefon raqami noto'g'ri formatda. Qaytadan yuboring.")
+    except CompanyServiceError as exc:
+        await message.answer(str(exc))
         return
 
     await state.update_data(dispatcher_phone=normalized_dispatcher_phone)
@@ -309,6 +311,39 @@ async def deactivate_company_subscription(
     await callback.answer("Obuna bekor qilindi.")
 
 
+@router.callback_query(CompanyActionCallback.filter(F.action == "edit_dispatcher_phone"))
+async def edit_company_dispatcher_phone_start(
+    callback: CallbackQuery,
+    callback_data: CompanyActionCallback,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    admin = await _authorize_super_admin_callback(callback, session)
+    if admin is None:
+        return
+
+    company_service = CompanyService(session)
+    company = await company_service.get_company(callback_data.company_id)
+    if company is None:
+        await callback.answer("Kompaniya topilmadi.", show_alert=True)
+        return
+
+    await state.clear()
+    await state.update_data(edit_company_id=company.id)
+    await state.set_state(CompanyManagementStates.waiting_for_dispatcher_phone_update)
+
+    current_phone = company.dispatcher_phone or "kiritilmagan"
+    if callback.message is not None:
+        await _safe_edit_text(
+            callback.message,
+            f"<b>{escape(company.name)}</b>\n\n"
+            f"Joriy dispecher telefoni: <b>{escape(current_phone)}</b>\n"
+            "Yangi dispecher telefon raqamini yuboring.",
+            reply_markup=build_company_cancel_keyboard(),
+        )
+    await callback.answer()
+
+
 @router.callback_query(CompanyActionCallback.filter(F.action == "bind_user"))
 async def disabled_bind_user_callback(callback: CallbackQuery) -> None:
     await callback.answer(
@@ -341,6 +376,51 @@ async def delete_company_callback(
             reply_markup=keyboard,
         )
     await callback.answer("Kompaniya o'chirildi.")
+
+
+@router.message(CompanyManagementStates.waiting_for_dispatcher_phone_update)
+async def update_company_dispatcher_phone(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    admin = await _authorize_super_admin_message(message, session)
+    if admin is None:
+        return
+
+    dispatcher_phone = (message.text or "").strip()
+    if not dispatcher_phone:
+        await message.answer("Dispecherlik telefon raqami majburiy. Qaytadan yuboring.")
+        return
+
+    data = await state.get_data()
+    company_id = data.get("edit_company_id")
+    if not isinstance(company_id, int):
+        await state.clear()
+        text, keyboard = await _build_company_list_view(session)
+        await message.answer(
+            "Kompaniya ma'lumoti topilmadi. Qaytadan tanlang.",
+            reply_markup=keyboard,
+        )
+        return
+
+    company_service = CompanyService(session)
+    try:
+        company = await company_service.update_dispatcher_phone(company_id, dispatcher_phone)
+    except CompanyNotFoundError as exc:
+        await state.clear()
+        await message.answer(str(exc))
+        return
+    except UserValidationError:
+        await message.answer("Telefon raqami noto'g'ri formatda. Qaytadan yuboring.")
+        return
+
+    await state.clear()
+    details_text = await _build_company_details_text(session, company)
+    await message.answer(
+        "Dispecherlik telefoni yangilandi.\n\n" + details_text,
+        reply_markup=build_company_actions_keyboard(company.id),
+    )
 
 
 async def _build_company_list_view(session: AsyncSession) -> tuple[str, InlineKeyboardMarkup]:

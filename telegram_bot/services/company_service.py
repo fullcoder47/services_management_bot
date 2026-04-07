@@ -148,6 +148,21 @@ class CompanyService:
         await self._session.refresh(company)
         return company
 
+    async def update_dispatcher_phone(self, company_id: int, dispatcher_phone: str) -> Company:
+        company = await self.get_company(company_id)
+        if company is None:
+            raise CompanyNotFoundError("Kompaniya topilmadi.")
+
+        try:
+            normalized_dispatcher_phone = UserService.normalize_phone_number(dispatcher_phone)
+        except UserValidationError as exc:
+            raise CompanyServiceError(str(exc)) from exc
+
+        company.dispatcher_phone = normalized_dispatcher_phone
+        await self._session.commit()
+        await self._session.refresh(company)
+        return company
+
     async def has_access(self, company_id: int) -> bool:
         company = await self.get_company(company_id)
         return bool(company and self.check_access(company))

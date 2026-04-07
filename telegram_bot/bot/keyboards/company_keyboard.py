@@ -37,7 +37,7 @@ def build_company_list_keyboard(companies: list[Company]) -> InlineKeyboardMarku
         )
 
     builder.button(
-        text="➕ Kompaniya qo‘shish",
+        text="➕ Kompaniya qo'shish",
         callback_data=CompanyMenuCallback(action="add"),
     )
     builder.adjust(1)
@@ -55,7 +55,11 @@ def build_company_actions_keyboard(company_id: int) -> InlineKeyboardMarkup:
         callback_data=CompanyActionCallback(action="deactivate", company_id=company_id),
     )
     builder.button(
-        text="🗑 O‘chirish",
+        text="📞 Dispecher raqamini o'zgartirish",
+        callback_data=CompanyActionCallback(action="edit_dispatcher_phone", company_id=company_id),
+    )
+    builder.button(
+        text="🗑 O'chirish",
         callback_data=CompanyActionCallback(action="delete", company_id=company_id),
     )
     builder.button(
