@@ -3,6 +3,7 @@ from __future__ import annotations
 from html import escape
 
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.types import Message, User as AiogramUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,16 +39,23 @@ async def dispatcher_call_handler(
         await message.answer(t(language, "dispatcher_phone_missing"))
         return
 
-    contact_name = company.name[:64] or "Dispatcher"
-    await message.answer_contact(
-        phone_number=company.dispatcher_phone,
-        first_name=contact_name,
-        reply_markup=build_dispatcher_call_keyboard(company.dispatcher_phone, language),
-    )
+    dial_phone = _normalize_dial_phone(company.dispatcher_phone)
+    contact_phone = dial_phone.removeprefix("+")
+
     await message.answer(
         f"{t(language, 'dispatcher_call_title')}\n\n"
-        f"{t(language, 'dispatcher_call_text', company=escape(company.name), phone=escape(company.dispatcher_phone))}",
+        f"{t(language, 'dispatcher_call_text', company=escape(company.name), phone=escape(dial_phone))}",
+        reply_markup=build_dispatcher_call_keyboard(dial_phone, language),
     )
+
+    try:
+        contact_name = (company.name[:64] or "Dispatcher").strip()
+        await message.answer_contact(
+            phone_number=contact_phone,
+            first_name=contact_name or "Dispatcher",
+        )
+    except TelegramBadRequest:
+        return
 
 
 async def _register_and_sync_user(
@@ -59,3 +67,10 @@ async def _register_and_sync_user(
         TelegramUserDTO.from_aiogram_user(telegram_user)
     )
     return registration.user
+
+
+def _normalize_dial_phone(phone_number: str) -> str:
+    normalized = phone_number.strip()
+    if normalized.startswith("+"):
+        return normalized
+    return f"+{normalized}"
