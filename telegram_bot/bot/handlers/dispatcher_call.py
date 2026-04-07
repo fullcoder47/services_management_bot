@@ -38,10 +38,15 @@ async def dispatcher_call_handler(
         await message.answer(t(language, "dispatcher_phone_missing"))
         return
 
+    contact_name = company.name[:64] or "Dispatcher"
+    await message.answer_contact(
+        phone_number=company.dispatcher_phone,
+        first_name=contact_name,
+        reply_markup=build_dispatcher_call_keyboard(company.dispatcher_phone, language),
+    )
     await message.answer(
         f"{t(language, 'dispatcher_call_title')}\n\n"
         f"{t(language, 'dispatcher_call_text', company=escape(company.name), phone=escape(company.dispatcher_phone))}",
-        reply_markup=build_dispatcher_call_keyboard(company.dispatcher_phone, language),
     )
 
 
