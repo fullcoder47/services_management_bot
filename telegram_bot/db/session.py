@@ -21,6 +21,8 @@ class Database:
             await connection.run_sync(Base.metadata.create_all)
             if connection.dialect.name == "sqlite":
                 await connection.run_sync(self._run_sqlite_migrations)
+            elif connection.dialect.name == "postgresql":
+                await connection.run_sync(self._run_postgresql_migrations)
 
     async def dispose(self) -> None:
         await self.engine.dispose()
@@ -126,6 +128,141 @@ class Database:
                     "CREATE TABLE IF NOT EXISTS request_workers ("
                     "request_id INTEGER NOT NULL, "
                     "worker_id INTEGER NOT NULL, "
+                    "PRIMARY KEY (request_id, worker_id)"
+                    ")"
+                )
+            )
+
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_request_workers_request_id "
+                "ON request_workers (request_id)"
+            )
+        )
+        connection.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_request_workers_worker_id "
+                "ON request_workers (worker_id)"
+            )
+        )
+
+    @staticmethod
+    def _run_postgresql_migrations(connection) -> None:
+        if connection.dialect.name != "postgresql":
+            return
+
+        inspector = inspect(connection)
+        table_names = set(inspector.get_table_names())
+        if "users" in table_names:
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id INTEGER")
+            )
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_number VARCHAR(32)")
+            )
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_language VARCHAR(8)")
+            )
+            connection.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_users_company_id ON users (company_id)")
+            )
+            connection.execute(
+                text("CREATE UNIQUE INDEX IF NOT EXISTS ix_users_telegram_id ON users (telegram_id)")
+            )
+
+        if "requests" in table_names:
+            connection.execute(
+                text(
+                    "ALTER TABLE requests "
+                    "ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFAULT 'pending'"
+                )
+            )
+            connection.execute(
+                text("ALTER TABLE requests ADD COLUMN IF NOT EXISTS result_text TEXT")
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE requests "
+                    "ADD COLUMN IF NOT EXISTS result_image VARCHAR(512) NOT NULL DEFAULT ''"
+                )
+            )
+            connection.execute(
+                text("ALTER TABLE requests ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP")
+            )
+            connection.execute(
+                text("ALTER TABLE requests ADD COLUMN IF NOT EXISTS company_id INTEGER")
+            )
+            connection.execute(
+                text("ALTER TABLE requests ADD COLUMN IF NOT EXISTS problem_image VARCHAR(512)")
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE requests "
+                    "ADD COLUMN IF NOT EXISTS address TEXT NOT NULL DEFAULT ''"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE requests "
+                    "ADD COLUMN IF NOT EXISTS source_type VARCHAR(32) NOT NULL DEFAULT 'user'"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE requests "
+                    "ADD COLUMN IF NOT EXISTS created_by_admin_id INTEGER"
+                )
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE requests "
+                    "ADD COLUMN IF NOT EXISTS accepted_by_worker_id INTEGER"
+                )
+            )
+            connection.execute(
+                text("ALTER TABLE requests ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMP")
+            )
+            connection.execute(
+                text(
+                    "ALTER TABLE requests "
+                    "ADD COLUMN IF NOT EXISTS completed_by_worker_id INTEGER"
+                )
+            )
+
+            connection.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_requests_user_id ON requests (user_id)")
+            )
+            connection.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_requests_company_id ON requests (company_id)")
+            )
+            connection.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_requests_status ON requests (status)")
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_requests_created_by_admin_id "
+                    "ON requests (created_by_admin_id)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_requests_accepted_by_worker_id "
+                    "ON requests (accepted_by_worker_id)"
+                )
+            )
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_requests_completed_by_worker_id "
+                    "ON requests (completed_by_worker_id)"
+                )
+            )
+
+        if "request_workers" not in table_names:
+            connection.execute(
+                text(
+                    "CREATE TABLE IF NOT EXISTS request_workers ("
+                    "request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE, "
+                    "worker_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, "
                     "PRIMARY KEY (request_id, worker_id)"
                     ")"
                 )
