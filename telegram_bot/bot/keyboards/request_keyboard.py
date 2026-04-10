@@ -26,6 +26,11 @@ class RequestDoneConfirmCallback(CallbackData, prefix="request_done_confirm"):
     request_id: int
 
 
+class RequestRejectConfirmCallback(CallbackData, prefix="request_reject_confirm"):
+    action: str
+    request_id: int
+
+
 def build_request_create_cancel_keyboard(language: UserLanguage) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(
@@ -105,6 +110,23 @@ def build_request_done_confirm_keyboard(request_id: int, language: UserLanguage)
     builder.button(
         text=t(language, "cancel"),
         callback_data=RequestDoneConfirmCallback(action="cancel", request_id=request_id),
+    )
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def build_request_reject_confirm_keyboard(
+    request_id: int,
+    language: UserLanguage,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=t(language, "request_reject_confirm_yes"),
+        callback_data=RequestRejectConfirmCallback(action="confirm", request_id=request_id),
+    )
+    builder.button(
+        text=t(language, "request_reject_confirm_no"),
+        callback_data=RequestRejectConfirmCallback(action="cancel", request_id=request_id),
     )
     builder.adjust(1)
     return builder.as_markup()

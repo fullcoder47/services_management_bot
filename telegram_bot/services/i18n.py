@@ -657,10 +657,34 @@ SETTINGS_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
     },
 }
 
+REQUEST_CONFIRM_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
+    UserLanguage.UZ: {
+        "request_reject_confirm_prompt": "Ariza #{request_id} ni rostdan ham o'chirmoqchimisiz?",
+        "request_reject_confirm_yes": "✅ Ha, o'chirish",
+        "request_reject_confirm_no": "⬅️ Yo'q, qoldirish",
+        "request_reject_cancelled": "Ariza o'chirilmadi.",
+    },
+    UserLanguage.RU: {
+        "request_reject_confirm_prompt": "Вы действительно хотите удалить заявку #{request_id}?",
+        "request_reject_confirm_yes": "✅ Да, удалить",
+        "request_reject_confirm_no": "⬅️ Нет, оставить",
+        "request_reject_cancelled": "Заявка не была удалена.",
+    },
+    UserLanguage.EN: {
+        "request_reject_confirm_prompt": "Do you really want to delete request #{request_id}?",
+        "request_reject_confirm_yes": "✅ Yes, delete",
+        "request_reject_confirm_no": "⬅️ No, keep it",
+        "request_reject_cancelled": "The request was not deleted.",
+    },
+}
+
 for language, mapping in EXTRA_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
 for language, mapping in SETTINGS_TRANSLATIONS.items():
+    TRANSLATIONS[language].update(mapping)
+
+for language, mapping in REQUEST_CONFIRM_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
 

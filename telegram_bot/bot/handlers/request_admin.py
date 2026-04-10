@@ -14,11 +14,13 @@ from bot.keyboards.request_keyboard import (
     RequestActionCallback,
     RequestDoneConfirmCallback,
     RequestMenuCallback,
+    RequestRejectConfirmCallback,
     RequestSelectCallback,
     build_request_admin_actions_keyboard,
     build_request_done_cancel_keyboard,
     build_request_done_confirm_keyboard,
     build_request_list_keyboard,
+    build_request_reject_confirm_keyboard,
 )
 from bot.states import RequestDoneStates
 from db.models import Request, RequestStatus, User, UserRole
@@ -152,6 +154,58 @@ async def request_accept_callback(
 async def request_reject_callback(
     callback: CallbackQuery,
     callback_data: RequestActionCallback,
+    session: AsyncSession,
+) -> None:
+    current_user = await _authorize_manager_callback(callback, session)
+    if current_user is None:
+        return
+
+    request_service = RequestService(session)
+    try:
+        request = await request_service.get_request_or_raise(callback_data.request_id)
+        request_service.ensure_management_access(current_user, request)
+        if request.status == RequestStatus.DONE:
+            raise RequestStateError("Bajarilgan arizani rad qilib bo'lmaydi.")
+    except (RequestNotFoundError, RequestAccessDeniedError, RequestStateError) as exc:
+        await callback.answer(str(exc), show_alert=True)
+        return
+
+    if callback.message is not None:
+        await _show_request_message(
+            callback.message,
+            t(current_user.ui_language, "request_reject_confirm_prompt", request_id=request.id),
+            reply_markup=build_request_reject_confirm_keyboard(request.id, current_user.ui_language),
+        )
+    await callback.answer()
+
+
+@router.callback_query(RequestRejectConfirmCallback.filter(F.action == "cancel"))
+async def request_reject_cancel_callback(
+    callback: CallbackQuery,
+    callback_data: RequestRejectConfirmCallback,
+    session: AsyncSession,
+) -> None:
+    current_user = await _authorize_manager_callback(callback, session)
+    if current_user is None:
+        return
+
+    request_service = RequestService(session)
+    try:
+        request = await request_service.get_request_or_raise(callback_data.request_id)
+        request_service.ensure_management_access(current_user, request)
+    except (RequestNotFoundError, RequestAccessDeniedError) as exc:
+        await callback.answer(str(exc), show_alert=True)
+        return
+
+    if callback.message is not None:
+        await _show_request_detail_message(callback.message, request, current_user)
+    await callback.answer(t(current_user.ui_language, "request_reject_cancelled"))
+
+
+@router.callback_query(RequestRejectConfirmCallback.filter(F.action == "confirm"))
+async def request_reject_confirm_callback(
+    callback: CallbackQuery,
+    callback_data: RequestRejectConfirmCallback,
     session: AsyncSession,
 ) -> None:
     current_user = await _authorize_manager_callback(callback, session)
