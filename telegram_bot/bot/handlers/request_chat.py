@@ -4,6 +4,7 @@ from html import escape
 
 from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramBadRequest
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message, User as AiogramUser
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,13 +15,14 @@ from bot.handlers.worker import _show_worker_request_detail
 from bot.keyboards.request_chat_keyboard import (
     RequestChatMenuCallback,
     RequestChatOpenCallback,
+    build_request_chat_list_keyboard,
     build_request_chat_notification_keyboard,
     build_request_chat_view_keyboard,
 )
 from bot.keyboards.user_keyboard import build_user_request_back_keyboard
 from bot.states import RequestChatStates
 from db.models import Request, RequestMessage, User, UserRole
-from services.i18n import t
+from services.i18n import button_variants, t
 from services.request_service import (
     RequestAccessDeniedError,
     RequestNotFoundError,
@@ -31,6 +33,22 @@ from services.user_service import TelegramUserDTO, UserService
 
 
 router = Router(name=__name__)
+
+
+@router.message(Command("chats"))
+@router.message(F.text.in_(button_variants("menu_request_chat")))
+async def request_chat_entry(
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    actor = await _authorize_chat_message(message, session)
+    if actor is None:
+        return
+
+    await state.clear()
+    text, keyboard = await _build_chat_requests_view(session, actor)
+    await message.answer(text, reply_markup=keyboard)
 
 
 @router.callback_query(RequestChatOpenCallback.filter())
@@ -89,12 +107,16 @@ async def request_chat_back(
 
     await state.clear()
     if callback.message is not None:
-        await _show_request_detail_for_source(
-            callback.message,
-            request=request,
-            actor=actor,
-            source=callback_data.source,
-        )
+        if callback_data.source.startswith("menu_"):
+            text, keyboard = await _build_chat_requests_view(session, actor)
+            await _show_list_view(callback.message, text, keyboard)
+        else:
+            await _show_request_detail_for_source(
+                callback.message,
+                request=request,
+                actor=actor,
+                source=callback_data.source,
+            )
     await callback.answer()
 
 
@@ -203,6 +225,30 @@ async def _show_chat_view(
     await _safe_edit_text(message, text, reply_markup=keyboard)
 
 
+async def _build_chat_requests_view(
+    session: AsyncSession,
+    actor: User,
+) -> tuple[str, object | None]:
+    request_service = RequestService(session)
+    requests = await request_service.list_requests_for_chat(actor)
+    source = _resolve_menu_source(actor)
+
+    lines = [t(actor.ui_language, "request_chat_menu_title"), ""]
+    if not requests:
+        lines.append(t(actor.ui_language, "request_chat_menu_empty"))
+        return "\n".join(lines), None
+
+    lines.append(t(actor.ui_language, "request_chat_menu_choose"))
+    lines.append("")
+    for request in requests[:20]:
+        title = request.user.display_name if request.user is not None else f"#{request.id}"
+        lines.append(
+            f"#{request.id} | {RequestService.format_status(request.status, actor.ui_language)} | {escape(title)}"
+        )
+
+    return "\n".join(lines), build_request_chat_list_keyboard(requests[:20], actor.ui_language, source)
+
+
 def _format_chat_view_text(
     request: Request,
     messages: list[RequestMessage],
@@ -272,6 +318,14 @@ def _resolve_chat_source_for_recipient(request: Request, recipient: User) -> str
     return "manager"
 
 
+def _resolve_menu_source(actor: User) -> str:
+    if actor.role == UserRole.USER:
+        return "menu_user"
+    if actor.role == UserRole.WORKER:
+        return "menu_worker"
+    return "menu_manager"
+
+
 def _format_sender_label(sender_role: UserRole, sender_name: str, recipient: User) -> str:
     role_key = {
         UserRole.SUPER_ADMIN: "role_super_admin",
@@ -321,6 +375,14 @@ async def _safe_edit_text(message: Message, text: str, reply_markup=None) -> Non
         if "message is not modified" in str(exc):
             return
         raise
+
+
+async def _show_list_view(message: Message, text: str, reply_markup=None) -> None:
+    if message.photo:
+        await _safe_clear_reply_markup(message)
+        await message.answer(text, reply_markup=reply_markup)
+        return
+    await _safe_edit_text(message, text, reply_markup=reply_markup)
 
 
 async def _safe_clear_reply_markup(message: Message) -> None:

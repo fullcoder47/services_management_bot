@@ -16,6 +16,7 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
                 KeyboardButton(text=t(language, "menu_create_request")),
             ]
         )
+        keyboard.append([KeyboardButton(text=t(language, "menu_request_chat"))])
         keyboard.append(
             [
                 KeyboardButton(text=t(language, "menu_workers")),
@@ -38,6 +39,7 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
                 KeyboardButton(text=t(language, "menu_create_request")),
             ]
         )
+        keyboard.append([KeyboardButton(text=t(language, "menu_request_chat"))])
         keyboard.append(
             [
                 KeyboardButton(text=t(language, "menu_workers")),
@@ -55,6 +57,7 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
 
     if role == UserRole.OPERATOR:
         keyboard.append([KeyboardButton(text=t(language, "menu_requests"))])
+        keyboard.append([KeyboardButton(text=t(language, "menu_request_chat"))])
         keyboard.append(
             [
                 KeyboardButton(text=t(language, "menu_help")),
@@ -71,6 +74,7 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
                 KeyboardButton(text=t(language, "menu_worker_done")),
             ]
         )
+        keyboard.append([KeyboardButton(text=t(language, "menu_request_chat"))])
         keyboard.append(
             [
                 KeyboardButton(text=t(language, "menu_help")),
@@ -81,7 +85,12 @@ def build_main_menu(*, role: UserRole, has_company: bool, language: UserLanguage
 
     if has_company:
         keyboard.append([KeyboardButton(text=t(language, "menu_leave_request"))])
-        keyboard.append([KeyboardButton(text=t(language, "menu_my_requests"))])
+        keyboard.append(
+            [
+                KeyboardButton(text=t(language, "menu_my_requests")),
+                KeyboardButton(text=t(language, "menu_request_chat")),
+            ]
+        )
         keyboard.append([KeyboardButton(text=t(language, "menu_call_dispatcher"))])
 
     keyboard.append(

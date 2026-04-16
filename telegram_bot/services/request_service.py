@@ -266,6 +266,40 @@ class RequestService:
         result = await self._session.execute(statement)
         return list(result.scalars().all())
 
+    async def list_requests_for_chat(self, actor: User) -> list[Request]:
+        if actor.role == UserRole.USER:
+            return await self.list_user_requests(actor.id)
+
+        if actor.role == UserRole.WORKER:
+            self.ensure_worker_access(actor)
+            statement = (
+                select(Request)
+                .options(
+                    selectinload(Request.user),
+                    selectinload(Request.company),
+                    selectinload(Request.creator_admin),
+                    selectinload(Request.accepted_by_worker),
+                    selectinload(Request.completed_by_worker),
+                    selectinload(Request.assigned_workers),
+                )
+                .where(
+                    Request.company_id == actor.company_id,
+                    or_(
+                        Request.assigned_workers.any(User.id == actor.id),
+                        Request.accepted_by_worker_id == actor.id,
+                        Request.completed_by_worker_id == actor.id,
+                    ),
+                )
+                .order_by(Request.created_at.desc(), Request.id.desc())
+            )
+            result = await self._session.execute(statement)
+            return list(result.scalars().all())
+
+        if actor.role in {UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OPERATOR}:
+            return await self.list_requests_for_manager(actor)
+
+        raise RequestAccessDeniedError("Chat bo'limiga kirish imkoni yo'q.")
+
     async def list_requests_for_worker(
         self,
         actor: User,

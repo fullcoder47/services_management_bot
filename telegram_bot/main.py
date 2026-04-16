@@ -36,6 +36,7 @@ async def main() -> None:
         [
             BotCommand(command="start", description="Botni qayta ochish"),
             BotCommand(command="yordam", description="Admin bilan bog'lanish"),
+            BotCommand(command="chats", description="Ariza chatlarini ochish"),
             BotCommand(command="settings", description="Sozlamalarni ochish"),
         ]
     )
