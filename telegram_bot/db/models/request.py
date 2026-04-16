@@ -120,3 +120,9 @@ class Request(Base, TimestampMixin):
         secondary=request_workers,
         back_populates="assigned_requests",
     )
+    messages: Mapped[list["RequestMessage"]] = relationship(
+        "RequestMessage",
+        back_populates="request",
+        cascade="all, delete-orphan",
+        order_by="RequestMessage.created_at.asc()",
+    )

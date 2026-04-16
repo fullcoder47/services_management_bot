@@ -7,9 +7,11 @@ from aiogram.filters import Command
 from aiogram.types import Message, User as AiogramUser
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bot.keyboards.help_keyboard import build_help_contacts_keyboard
 from db.models import User
+from services.help_service import HelpContext, HelpService
 from services.i18n import button_variants, t
-from services.user_service import CompanyAdminContacts, TelegramUserDTO, UserService
+from services.user_service import TelegramUserDTO, UserService
 
 
 router = Router(name=__name__)
@@ -27,9 +29,11 @@ async def help_handler(
         return
 
     user = await _register_and_sync_user(message.from_user, session)
-    user_service = UserService(session)
-    contacts = await user_service.get_company_admin_contacts()
-    await message.answer(_build_help_text(contacts, user.ui_language))
+    help_context = await HelpService(UserService(session)).get_help_context(user)
+    await message.answer(
+        _build_help_text(user, help_context),
+        reply_markup=build_help_contacts_keyboard(help_context.contacts, user.ui_language),
+    )
 
 
 async def _register_and_sync_user(
@@ -41,32 +45,29 @@ async def _register_and_sync_user(
     return registration.user
 
 
-def _build_help_text(contacts: list[CompanyAdminContacts], language) -> str:
+def _build_help_text(actor: User, context: HelpContext) -> str:
     lines = [
-        t(language, "help_title"),
+        t(actor.ui_language, "help_title"),
         "",
-        t(language, "help_text"),
+        t(actor.ui_language, context.description_key),
         "",
     ]
 
-    if not contacts:
-        lines.append(t(language, "help_no_companies"))
+    if not context.contacts:
+        lines.append(t(actor.ui_language, context.empty_key))
         return "\n".join(lines)
 
-    for contact in contacts:
-        lines.append(f"🏢 <b>{escape(contact.company.name)}</b>")
-        if contact.admins:
-            for admin in contact.admins:
-                lines.append(f"• {build_user_profile_link(admin)}")
-        else:
-            lines.append(f"• {t(language, 'help_no_admin')}")
-        lines.append("")
+    for contact in context.contacts:
+        lines.append(f"• {build_user_profile_link(contact, actor)}")
 
     return "\n".join(lines).strip()
 
 
-def build_user_profile_link(user: User) -> str:
-    label = f"@{user.username}" if user.username else escape(user.display_name)
+def build_user_profile_link(user: User, viewer: User) -> str:
     if user.username:
+        label = f"@{user.username}"
         return f'<a href="https://t.me/{escape(user.username)}">{label}</a>'
-    return f'<a href="tg://user?id={user.telegram_id}">{label}</a>'
+    return (
+        f"{escape(user.display_name)}"
+        f" ({t(viewer.ui_language, 'help_no_username')}: {user.telegram_id})"
+    )

@@ -4,6 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
+from bot.keyboards.request_chat_keyboard import RequestChatOpenCallback
 from db.models import Company, Request, UserLanguage
 from services.i18n import t
 from services.request_service import RequestService
@@ -74,8 +75,16 @@ def build_user_request_list_keyboard(requests: list[Request], language: UserLang
     return builder.as_markup()
 
 
-def build_user_request_back_keyboard(language: UserLanguage) -> InlineKeyboardMarkup:
+def build_user_request_back_keyboard(
+    language: UserLanguage,
+    request_id: int | None = None,
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    if request_id is not None:
+        builder.button(
+            text=t(language, "request_chat"),
+            callback_data=RequestChatOpenCallback(request_id=request_id, source="user"),
+        )
     builder.button(
         text=t(language, "request_back"),
         callback_data=UserRequestMenuCallback(action="list"),

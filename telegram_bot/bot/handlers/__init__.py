@@ -8,6 +8,7 @@ from .help import router as help_router
 from .manager import router as manager_router
 from .request import router as request_router
 from .request_admin import router as request_admin_router
+from .request_chat import router as request_chat_router
 from .settings import router as settings_router
 from .start import router as start_router
 from .worker import router as worker_router
@@ -20,6 +21,7 @@ def register_routers(dispatcher: Dispatcher) -> None:
     dispatcher.include_router(dispatcher_call_router)
     dispatcher.include_router(settings_router)
     dispatcher.include_router(request_router)
+    dispatcher.include_router(request_chat_router)
     dispatcher.include_router(admin_requests_router)
     dispatcher.include_router(worker_router)
     dispatcher.include_router(request_admin_router)

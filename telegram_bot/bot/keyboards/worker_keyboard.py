@@ -4,6 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from bot.keyboards.request_chat_keyboard import RequestChatOpenCallback
 from db.models import Company, Request, RequestStatus, User, UserLanguage
 from services.i18n import t
 from services.request_service import RequestService
@@ -75,6 +76,10 @@ def build_worker_request_actions_keyboard(
             text=t(language, "request_done"),
             callback_data=WorkerRequestActionCallback(action="done", request_id=request.id, view=view),
         )
+    builder.button(
+        text=t(language, "request_chat"),
+        callback_data=RequestChatOpenCallback(request_id=request.id, source=f"worker_{view}"),
+    )
 
     builder.button(
         text=t(language, "request_back"),
@@ -89,8 +94,14 @@ def build_worker_done_cancel_keyboard(
     *,
     language: UserLanguage,
     view: str,
+    allow_skip: bool = False,
 ) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    if allow_skip:
+        builder.button(
+            text=t(language, "skip"),
+            callback_data=WorkerDoneConfirmCallback(action="skip", request_id=request_id, view=view),
+        )
     builder.button(
         text=t(language, "cancel"),
         callback_data=WorkerDoneConfirmCallback(action="cancel", request_id=request_id, view=view),

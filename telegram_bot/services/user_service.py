@@ -113,6 +113,24 @@ class UserService:
         result = await self._session.execute(statement)
         return list(result.scalars().all())
 
+    async def get_company_admins(self, company_id: int) -> list[User]:
+        statement = (
+            select(User)
+            .where(User.company_id == company_id, User.role == UserRole.ADMIN)
+            .order_by(User.first_name.asc(), User.id.asc())
+        )
+        result = await self._session.execute(statement)
+        return list(result.scalars().all())
+
+    async def get_super_admins(self) -> list[User]:
+        statement = (
+            select(User)
+            .where(User.role == UserRole.SUPER_ADMIN)
+            .order_by(User.id.asc())
+        )
+        result = await self._session.execute(statement)
+        return list(result.scalars().all())
+
     async def list_users_for_actor(self, actor: User) -> list[User]:
         if actor.is_super_admin:
             statement = (

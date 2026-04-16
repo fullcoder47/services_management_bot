@@ -4,6 +4,7 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from bot.keyboards.request_chat_keyboard import RequestChatOpenCallback
 from db.models import Request, RequestStatus, UserLanguage
 from services.i18n import t
 
@@ -55,8 +56,18 @@ def build_request_optional_image_keyboard(language: UserLanguage) -> InlineKeybo
     return builder.as_markup()
 
 
-def build_request_done_cancel_keyboard(request_id: int, language: UserLanguage) -> InlineKeyboardMarkup:
+def build_request_done_cancel_keyboard(
+    request_id: int,
+    language: UserLanguage,
+    *,
+    allow_skip: bool = False,
+) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    if allow_skip:
+        builder.button(
+            text=t(language, "skip"),
+            callback_data=RequestDoneConfirmCallback(action="skip", request_id=request_id),
+        )
     builder.button(
         text=t(language, "cancel"),
         callback_data=RequestDoneConfirmCallback(action="cancel", request_id=request_id),
@@ -93,6 +104,10 @@ def build_request_admin_actions_keyboard(
             text=t(language, "request_done"),
             callback_data=RequestActionCallback(action="done", request_id=request.id),
         )
+    builder.button(
+        text=t(language, "request_chat"),
+        callback_data=RequestChatOpenCallback(request_id=request.id, source="manager"),
+    )
     builder.button(
         text=t(language, "request_back"),
         callback_data=RequestMenuCallback(action="list"),

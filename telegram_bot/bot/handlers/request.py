@@ -185,7 +185,7 @@ async def user_request_detail_callback(
         await _safe_edit_text(
             callback.message,
             _format_user_request_detail(request, current_user.ui_language),
-            reply_markup=build_user_request_back_keyboard(current_user.ui_language),
+            reply_markup=build_user_request_back_keyboard(current_user.ui_language, request.id),
         )
     await callback.answer()
 

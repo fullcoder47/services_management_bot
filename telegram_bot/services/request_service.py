@@ -11,7 +11,15 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from db.models import Request, RequestSourceType, RequestStatus, User, UserLanguage, UserRole
+from db.models import (
+    Request,
+    RequestMessage,
+    RequestSourceType,
+    RequestStatus,
+    User,
+    UserLanguage,
+    UserRole,
+)
 from services.i18n import t
 
 
@@ -58,7 +66,7 @@ class CreateAdminRequestDTO:
 @dataclass(slots=True)
 class CompleteRequestDTO:
     result_text: str
-    result_image: str
+    result_image: str | None = None
 
 
 class RequestService:
@@ -127,6 +135,99 @@ class RequestService:
         request = await self.get_request_or_raise(request_id)
         self.ensure_worker_request_access(actor, request)
         return request
+
+    async def get_request_for_chat(self, request_id: int, actor: User) -> Request:
+        request = await self.get_request_or_raise(request_id)
+        self.ensure_chat_access(actor, request)
+        return request
+
+    async def get_request_message(self, message_id: int) -> RequestMessage | None:
+        statement = (
+            select(RequestMessage)
+            .options(selectinload(RequestMessage.sender), selectinload(RequestMessage.request))
+            .where(RequestMessage.id == message_id)
+        )
+        result = await self._session.execute(statement)
+        return result.scalar_one_or_none()
+
+    async def get_request_message_or_raise(self, message_id: int) -> RequestMessage:
+        message = await self.get_request_message(message_id)
+        if message is None:
+            raise RequestNotFoundError("Chat xabari topilmadi.")
+        return message
+
+    async def list_request_messages_for_actor(
+        self,
+        request_id: int,
+        actor: User,
+        *,
+        limit: int = 8,
+    ) -> tuple[Request, list[RequestMessage]]:
+        request = await self.get_request_for_chat(request_id, actor)
+        statement = (
+            select(RequestMessage)
+            .options(selectinload(RequestMessage.sender))
+            .where(RequestMessage.request_id == request.id)
+            .order_by(RequestMessage.created_at.desc(), RequestMessage.id.desc())
+            .limit(limit)
+        )
+        result = await self._session.execute(statement)
+        messages = list(reversed(result.scalars().all()))
+        return request, messages
+
+    async def create_request_message(
+        self,
+        request_id: int,
+        actor: User,
+        text: str,
+    ) -> RequestMessage:
+        request = await self.get_request_for_chat(request_id, actor)
+        cleaned_text = text.strip()
+        if not cleaned_text:
+            raise RequestValidationError("Chat uchun xabar matni majburiy.")
+
+        message = RequestMessage(
+            request_id=request.id,
+            sender_user_id=actor.id,
+            sender_role=actor.role,
+            text=cleaned_text,
+            created_at=self._utcnow(),
+        )
+        self._session.add(message)
+        await self._session.commit()
+        await self._session.refresh(message)
+        return await self.get_request_message_or_raise(message.id)
+
+    async def get_request_chat_recipients(
+        self,
+        request_id: int,
+        sender: User,
+    ) -> tuple[Request, list[User]]:
+        request = await self.get_request_for_chat(request_id, sender)
+        recipients: list[User] = []
+        seen_user_ids: set[int] = {sender.id}
+
+        def add_recipient(user: User | None) -> None:
+            if user is None:
+                return
+            if user.id in seen_user_ids:
+                return
+            seen_user_ids.add(user.id)
+            recipients.append(user)
+
+        if request.user is not None:
+            add_recipient(request.user)
+
+        for manager in await self.get_management_recipients(request.company_id):
+            add_recipient(manager)
+
+        add_recipient(request.creator_admin)
+        add_recipient(request.accepted_by_worker)
+        add_recipient(request.completed_by_worker)
+        for worker in request.assigned_workers:
+            add_recipient(worker)
+
+        return request, recipients
 
     async def list_requests_for_manager(self, actor: User) -> list[Request]:
         self.ensure_can_manage_requests(actor)
@@ -345,18 +446,16 @@ class RequestService:
         self.ensure_completion_access(actor, request)
 
         result_text = payload.result_text.strip()
-        result_image = payload.result_image.strip()
+        result_image = payload.result_image.strip() if isinstance(payload.result_image, str) else None
 
         if not result_text:
             raise RequestValidationError("Bajarilgan ish tavsifi majburiy.")
-        if not result_image:
-            raise RequestValidationError("Bajarilgan ish rasmi majburiy.")
         if request.status == RequestStatus.DONE:
             raise RequestStateError("Bu ariza allaqachon bajarilgan.")
 
         request.status = RequestStatus.DONE
         request.result_text = result_text
-        request.result_image = result_image
+        request.result_image = result_image or ""
         if actor.role == UserRole.WORKER:
             request.completed_by_worker_id = actor.id
             if request.accepted_by_worker_id is None:
@@ -427,6 +526,22 @@ class RequestService:
             return
 
         self.ensure_management_access(actor, request)
+
+    def ensure_chat_access(self, actor: User, request: Request) -> None:
+        if actor.role == UserRole.USER:
+            if request.user_id != actor.id:
+                raise RequestAccessDeniedError("Siz bu chatni ko'ra olmaysiz.")
+            return
+
+        if actor.role == UserRole.WORKER:
+            self.ensure_worker_request_access(actor, request)
+            return
+
+        if actor.role in {UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.OPERATOR}:
+            self.ensure_management_access(actor, request)
+            return
+
+        raise RequestAccessDeniedError("Siz bu chatni ko'ra olmaysiz.")
 
     def ensure_can_export_requests(self, actor: User) -> None:
         if actor.role not in {UserRole.SUPER_ADMIN, UserRole.ADMIN}:

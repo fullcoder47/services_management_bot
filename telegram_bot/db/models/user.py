@@ -85,6 +85,11 @@ class User(Base, TimestampMixin):
         secondary="request_workers",
         back_populates="assigned_workers",
     )
+    request_messages: Mapped[list["RequestMessage"]] = relationship(
+        "RequestMessage",
+        back_populates="sender",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def is_super_admin(self) -> bool:

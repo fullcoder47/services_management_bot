@@ -191,7 +191,12 @@ async def worker_capture_done_text(
     await state.set_state(WorkerDoneStates.waiting_for_result_image)
     await message.answer(
         t(actor.ui_language, "request_done_image_prompt"),
-        reply_markup=build_worker_done_cancel_keyboard(request_id, language=actor.ui_language, view=view),
+        reply_markup=build_worker_done_cancel_keyboard(
+            request_id,
+            language=actor.ui_language,
+            view=view,
+            allow_skip=True,
+        ),
     )
 
 
@@ -226,6 +231,49 @@ async def worker_capture_done_image(
     )
 
 
+@router.callback_query(
+    WorkerDoneConfirmCallback.filter(F.action == "skip"),
+    WorkerDoneStates.waiting_for_result_image,
+)
+async def worker_skip_done_image(
+    callback: CallbackQuery,
+    callback_data: WorkerDoneConfirmCallback,
+    state: FSMContext,
+    session: AsyncSession,
+) -> None:
+    actor = await _authorize_worker_callback(callback, session)
+    if actor is None:
+        return
+
+    request_id = await _extract_request_id(state)
+    view = await _extract_view(state)
+    if request_id is None or view is None or request_id != callback_data.request_id:
+        await state.clear()
+        await callback.answer(t(actor.ui_language, "request_data_missing"), show_alert=True)
+        return
+
+    await state.update_data(result_image=None)
+    await state.set_state(WorkerDoneStates.waiting_for_confirmation)
+    data = await state.get_data()
+    summary = (
+        f"{t(actor.ui_language, 'request_done_summary')}\n\n"
+        f"{t(actor.ui_language, 'request_done_note_label')}: "
+        f"<b>{escape(str(data.get('result_text', '')))}</b>\n"
+        f"{t(actor.ui_language, 'request_done_no_image')}"
+    )
+    if callback.message is not None:
+        await _show_worker_message(
+            callback.message,
+            summary,
+            reply_markup=build_worker_done_confirm_keyboard(
+                request_id,
+                language=actor.ui_language,
+                view=view,
+            ),
+        )
+    await callback.answer()
+
+
 @router.message(WorkerDoneStates.waiting_for_result_image)
 async def worker_capture_done_image_invalid(
     message: Message,
@@ -245,7 +293,12 @@ async def worker_capture_done_image_invalid(
 
     await message.answer(
         t(actor.ui_language, "request_done_image_required"),
-        reply_markup=build_worker_done_cancel_keyboard(request_id, language=actor.ui_language, view=view),
+        reply_markup=build_worker_done_cancel_keyboard(
+            request_id,
+            language=actor.ui_language,
+            view=view,
+            allow_skip=True,
+        ),
     )
 
 
@@ -303,7 +356,11 @@ async def worker_done_confirm(
     request_id = data.get("request_id")
     result_text = data.get("result_text")
     result_image = data.get("result_image")
-    if not isinstance(request_id, int) or not isinstance(result_text, str) or not isinstance(result_image, str):
+    if (
+        not isinstance(request_id, int)
+        or not isinstance(result_text, str)
+        or (result_image is not None and not isinstance(result_image, str))
+    ):
         await state.clear()
         await callback.answer(t(actor.ui_language, "request_data_missing"), show_alert=True)
         return
@@ -495,17 +552,25 @@ async def _notify_user_request_done(bot, request: Request, worker: User) -> None
         worker=escape(worker.display_name),
         note=escape(request.result_text or ""),
     )
-    try:
-        await bot.send_photo(
-            chat_id=request.user.telegram_id,
-            photo=request.result_image,
-            caption=caption,
-        )
-    except Exception:
+
+    if request.result_image:
         try:
-            await bot.send_message(request.user.telegram_id, caption)
+            await bot.send_photo(
+                chat_id=request.user.telegram_id,
+                photo=request.result_image,
+                caption=caption,
+            )
         except Exception:
-            return
+            try:
+                await bot.send_message(request.user.telegram_id, caption)
+            except Exception:
+                return
+        return
+
+    try:
+        await bot.send_message(request.user.telegram_id, caption)
+    except Exception:
+        return
 
 
 async def _authorize_worker_message(

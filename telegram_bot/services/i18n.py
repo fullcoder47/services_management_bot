@@ -678,6 +678,75 @@ REQUEST_CONFIRM_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
     },
 }
 
+REQUEST_CHAT_AND_HELP_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
+    UserLanguage.UZ: {
+        "request_chat": "💬 Chat",
+        "request_chat_title": "💬 Ariza #{request_id} chat",
+        "request_chat_empty": "Hozircha yozishmalar yo'q.",
+        "request_chat_prompt": "Yangi xabar yuborish uchun matn yozing.",
+        "request_chat_invalid": "Chatga faqat matn yuborishingiz mumkin.",
+        "request_chat_notification_title": "💬 Ariza #{request_id} bo'yicha yangi xabar",
+        "request_chat_notification_from": "Kimdan",
+        "request_chat_message_label": "Xabar",
+        "help_contact_button": "📞 Profil",
+        "help_user_text": "Agar savol, muammo yoki taklif bo'lsa, quyidagi admin bilan bog'laning.",
+        "help_admin_text": "Agar tizim bo'yicha savol yoki muammo bo'lsa, quyidagi super admin bilan bog'laning.",
+        "help_worker_text": "Agar ish jarayoni bo'yicha savol yoki muammo bo'lsa, quyidagi admin bilan bog'laning.",
+        "help_worker_super_admin_text": "Admin topilmasa, quyidagi super admin bilan bog'laning.",
+        "help_super_admin_text": "Siz tizimning super adminisiz.",
+        "help_super_admin_empty": "Qo'shimcha yordam uchun alohida kontakt topilmadi.",
+        "help_no_super_admin": "Super admin topilmadi.",
+        "help_no_username": "username yo'q",
+        "request_done_image_prompt": "Bajarilgan ish rasmini yuboring yoki pastdagi tugma bilan o'tkazib yuboring.",
+        "request_done_image_required": "Rasm yuboring yoki `O‘tkazib yuborish` tugmasini bosing.",
+        "request_done_no_image": "📷 Rasm qo'shilmaydi",
+    },
+    UserLanguage.RU: {
+        "request_chat": "💬 Чат",
+        "request_chat_title": "💬 Чат по заявке #{request_id}",
+        "request_chat_empty": "Переписка пока отсутствует.",
+        "request_chat_prompt": "Напишите сообщение, чтобы отправить его в этот чат.",
+        "request_chat_invalid": "В чат можно отправлять только текст.",
+        "request_chat_notification_title": "💬 Новое сообщение по заявке #{request_id}",
+        "request_chat_notification_from": "От кого",
+        "request_chat_message_label": "Сообщение",
+        "help_contact_button": "📞 Профиль",
+        "help_user_text": "Если у вас есть вопрос, проблема или предложение, свяжитесь с администратором ниже.",
+        "help_admin_text": "Если у вас есть вопрос или проблема по системе, свяжитесь с super admin ниже.",
+        "help_worker_text": "Если у вас есть вопрос или проблема по рабочему процессу, свяжитесь с администратором ниже.",
+        "help_worker_super_admin_text": "Если администратор недоступен, свяжитесь с super admin ниже.",
+        "help_super_admin_text": "Вы являетесь super admin этой системы.",
+        "help_super_admin_empty": "Дополнительные контакты помощи не найдены.",
+        "help_no_super_admin": "Super admin не найден.",
+        "help_no_username": "username отсутствует",
+        "request_done_image_prompt": "Отправьте фото выполненной работы или пропустите этот шаг кнопкой ниже.",
+        "request_done_image_required": "Отправьте фото или нажмите кнопку `Пропустить`.",
+        "request_done_no_image": "📷 Фото не будет добавлено",
+    },
+    UserLanguage.EN: {
+        "request_chat": "💬 Chat",
+        "request_chat_title": "💬 Request #{request_id} chat",
+        "request_chat_empty": "There are no messages yet.",
+        "request_chat_prompt": "Type a message to send it to this chat.",
+        "request_chat_invalid": "Only text messages can be sent to this chat.",
+        "request_chat_notification_title": "💬 New message for request #{request_id}",
+        "request_chat_notification_from": "From",
+        "request_chat_message_label": "Message",
+        "help_contact_button": "📞 Profile",
+        "help_user_text": "If you have a question, issue, or suggestion, contact the admin below.",
+        "help_admin_text": "If you have a system question or issue, contact the super admin below.",
+        "help_worker_text": "If you have a work-related question or issue, contact the admin below.",
+        "help_worker_super_admin_text": "If no admin is available, contact the super admin below.",
+        "help_super_admin_text": "You are the super admin of this system.",
+        "help_super_admin_empty": "No additional support contact was found.",
+        "help_no_super_admin": "Super admin was not found.",
+        "help_no_username": "no username",
+        "request_done_image_prompt": "Send a photo of the completed work or skip this step with the button below.",
+        "request_done_image_required": "Send a photo or press the `Skip` button.",
+        "request_done_no_image": "📷 No photo will be attached",
+    },
+}
+
 for language, mapping in EXTRA_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
@@ -685,6 +754,9 @@ for language, mapping in SETTINGS_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
 for language, mapping in REQUEST_CONFIRM_TRANSLATIONS.items():
+    TRANSLATIONS[language].update(mapping)
+
+for language, mapping in REQUEST_CHAT_AND_HELP_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
 
