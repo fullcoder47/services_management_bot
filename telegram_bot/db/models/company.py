@@ -38,3 +38,9 @@ class Company(Base, TimestampMixin):
 
     users: Mapped[list["User"]] = relationship("User", back_populates="company")
     requests: Mapped[list["Request"]] = relationship("Request", back_populates="company")
+    chat_messages: Mapped[list["CompanyChatMessage"]] = relationship(
+        "CompanyChatMessage",
+        back_populates="company",
+        cascade="all, delete-orphan",
+        order_by="CompanyChatMessage.created_at.asc()",
+    )

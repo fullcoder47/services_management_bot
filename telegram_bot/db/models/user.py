@@ -90,6 +90,11 @@ class User(Base, TimestampMixin):
         back_populates="sender",
         cascade="all, delete-orphan",
     )
+    company_chat_messages: Mapped[list["CompanyChatMessage"]] = relationship(
+        "CompanyChatMessage",
+        back_populates="sender",
+        cascade="all, delete-orphan",
+    )
 
     @property
     def is_super_admin(self) -> bool:

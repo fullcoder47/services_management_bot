@@ -1,4 +1,5 @@
 from .admin_state import AdminAssignStates
+from .company_chat_state import CompanyChatStates
 from .admin_request_state import AdminRequestStates
 from .manager_state import BroadcastStates
 from .request_chat_state import RequestChatStates
@@ -11,6 +12,7 @@ __all__ = [
     "AdminAssignStates",
     "AdminRequestStates",
     "BroadcastStates",
+    "CompanyChatStates",
     "RequestChatStates",
     "RequestCreateStates",
     "RequestDoneStates",

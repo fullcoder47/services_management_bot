@@ -759,6 +759,84 @@ REQUEST_CHAT_AND_HELP_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
     },
 }
 
+COMPANY_CHAT_MENU_TRANSLATIONS: dict[UserLanguage, dict[str, str]] = {
+    UserLanguage.UZ: {
+        "company_chat_root_title_user": "💬 Kompaniya chat",
+        "company_chat_root_title_admin": "💬 Chat bo'limi",
+        "company_chat_root_title_super_admin": "💬 Chat boshqaruvi",
+        "company_chat_root_prompt_user": "Bu bo'limda kompaniyangizdagi barcha userlar va adminlar bilan yozishishingiz mumkin.",
+        "company_chat_root_prompt_admin": "Kerakli chat turini tanlang.",
+        "company_chat_root_prompt_super_admin": "Avval chat turini, keyin kompaniyani tanlang.",
+        "company_chat_open_company_chat": "💬 Chatni ochish",
+        "company_chat_with_users": "👥 Userlar bilan chat",
+        "company_chat_with_super_admin": "🛡 Super admin bilan chat",
+        "company_chat_with_admins": "🛡 Adminlar bilan chat",
+        "company_chat_choose_company": "🏢 Chat uchun kompaniyani tanlang.",
+        "company_chat_no_company": "Siz hali kompaniyaga biriktirilmagansiz.",
+        "company_chat_no_companies": "Hozircha chat uchun kompaniyalar topilmadi.",
+        "company_chat_title_company_users": "💬 {company} | Userlar chat",
+        "company_chat_title_company_admins": "💬 {company} | Adminlar chat",
+        "company_chat_empty": "Hozircha xabarlar yo'q.",
+        "company_chat_prompt": "Yangi xabar yuborish uchun matn yozing.",
+        "company_chat_invalid": "Chatga faqat matn yuborishingiz mumkin.",
+        "company_chat_notification_title": "💬 Kompaniya chatida yangi xabar",
+        "company_chat_notification_from": "Kimdan",
+        "company_chat_message_label": "Xabar",
+        "company_chat_back": "⬅️ Orqaga",
+        "company_chat_company_label": "Kompaniya",
+    },
+    UserLanguage.RU: {
+        "company_chat_root_title_user": "💬 Чат компании",
+        "company_chat_root_title_admin": "💬 Раздел чатов",
+        "company_chat_root_title_super_admin": "💬 Управление чатами",
+        "company_chat_root_prompt_user": "Здесь вы можете общаться со всеми пользователями и администраторами вашей компании.",
+        "company_chat_root_prompt_admin": "Выберите нужный тип чата.",
+        "company_chat_root_prompt_super_admin": "Сначала выберите тип чата, затем компанию.",
+        "company_chat_open_company_chat": "💬 Открыть чат",
+        "company_chat_with_users": "👥 Чат с пользователями",
+        "company_chat_with_super_admin": "🛡 Чат с super admin",
+        "company_chat_with_admins": "🛡 Чат с администраторами",
+        "company_chat_choose_company": "🏢 Выберите компанию для чата.",
+        "company_chat_no_company": "Вы пока не привязаны к компании.",
+        "company_chat_no_companies": "Компании для чата пока не найдены.",
+        "company_chat_title_company_users": "💬 {company} | Чат пользователей",
+        "company_chat_title_company_admins": "💬 {company} | Чат администраторов",
+        "company_chat_empty": "Сообщений пока нет.",
+        "company_chat_prompt": "Напишите текст, чтобы отправить новое сообщение.",
+        "company_chat_invalid": "В этот чат можно отправлять только текст.",
+        "company_chat_notification_title": "💬 Новое сообщение в чате компании",
+        "company_chat_notification_from": "От кого",
+        "company_chat_message_label": "Сообщение",
+        "company_chat_back": "⬅️ Назад",
+        "company_chat_company_label": "Компания",
+    },
+    UserLanguage.EN: {
+        "company_chat_root_title_user": "💬 Company chat",
+        "company_chat_root_title_admin": "💬 Chat section",
+        "company_chat_root_title_super_admin": "💬 Chat management",
+        "company_chat_root_prompt_user": "Here you can chat with all users and admins in your company.",
+        "company_chat_root_prompt_admin": "Choose the chat type you need.",
+        "company_chat_root_prompt_super_admin": "Choose a chat type first, then select a company.",
+        "company_chat_open_company_chat": "💬 Open chat",
+        "company_chat_with_users": "👥 Chat with users",
+        "company_chat_with_super_admin": "🛡 Chat with super admin",
+        "company_chat_with_admins": "🛡 Chat with admins",
+        "company_chat_choose_company": "🏢 Choose a company for chat.",
+        "company_chat_no_company": "You are not assigned to any company yet.",
+        "company_chat_no_companies": "No companies are available for chat right now.",
+        "company_chat_title_company_users": "💬 {company} | Users chat",
+        "company_chat_title_company_admins": "💬 {company} | Admins chat",
+        "company_chat_empty": "There are no messages yet.",
+        "company_chat_prompt": "Type a text message to send a new message.",
+        "company_chat_invalid": "Only text messages can be sent to this chat.",
+        "company_chat_notification_title": "💬 New message in company chat",
+        "company_chat_notification_from": "From",
+        "company_chat_message_label": "Message",
+        "company_chat_back": "⬅️ Back",
+        "company_chat_company_label": "Company",
+    },
+}
+
 for language, mapping in EXTRA_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
@@ -769,6 +847,9 @@ for language, mapping in REQUEST_CONFIRM_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
 for language, mapping in REQUEST_CHAT_AND_HELP_TRANSLATIONS.items():
+    TRANSLATIONS[language].update(mapping)
+
+for language, mapping in COMPANY_CHAT_MENU_TRANSLATIONS.items():
     TRANSLATIONS[language].update(mapping)
 
 
